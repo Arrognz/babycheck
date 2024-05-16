@@ -9,6 +9,12 @@ import (
 	_ "github.com/heroku/x/hmetrics/onload"
 )
 
+func pong(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"message": "pong",
+	})
+}
+
 func main() {
 	port := os.Getenv("PORT")
 
@@ -24,6 +30,12 @@ func main() {
 	router.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.tmpl.html", nil)
 	})
+
+	// api group
+	api := router.Group("/api")
+	{
+		api.GET("/ping", pong)
+	}
 
 	router.Run(":" + port)
 }
