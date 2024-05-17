@@ -12,6 +12,41 @@ class Api {
         const body = await response.json();
         return body.message;
     }
+
+    async remote(action) {
+        try {
+
+            const response = await fetch(`${this.baseUrl}/remote/${action}`, { 
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+            });
+            const body = await response.json();
+            return body;
+        } catch (e) {
+            console.error(e);
+            return {};
+        }
+    }
+
+    async search(start, stop) {
+        try {
+            // post request with start and stop body parameters as unix timestamps
+            const response = await fetch(`${this.baseUrl}/search`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ start, stop })
+            });
+            const body = await response.json();
+            return body;
+        } catch (e) {
+            console.error(e);
+            return {};
+        }
+    }
 }
 
 const api = new Api();
