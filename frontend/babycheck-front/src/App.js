@@ -32,6 +32,8 @@ function App() {
   useEffect(() => {
     // api search from now - 6 hours to now
     const fetchData = async () => {
+      // await 2s
+      await new Promise(resolve => setTimeout(resolve, 2000));
       const response = await Api.search(new Date().getTime() - 6*60*60*1000, new Date().getTime());
       setEvents(response.events);
     };

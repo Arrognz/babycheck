@@ -57,6 +57,7 @@ func NewStorage() *Storage {
 	}
 	st.keys = map[string]string{
 		"babyevents": "ts_events",
+		"debug":      "ts_debug",
 	}
 	return st
 }
@@ -78,12 +79,21 @@ func (s *Storage) Update(action string, time time.Time) bool {
 		Score:  float64(time.UnixMilli()),
 		Member: jsonEvent,
 	}
-	s.redis.ZAdd(s.ctx, s.keys["babyevents"], zData)
+	// if GIN_MODE is not release, use debug bucket
+	if os.Getenv("GIN_MODE") != "release" {
+		s.redis.ZAdd(s.ctx, s.keys["debug"], zData)
+	} else {
+		s.redis.ZAdd(s.ctx, s.keys["babyevents"], zData)
+	}
 	return true
 }
 
 func (s *Storage) Search(start, end int64) []DBBabyEvent {
-	zs := s.redis.ZRangeByScore(s.ctx, s.keys["babyevents"], &redis.ZRangeBy{
+	bucket := s.keys["babyevents"]
+	if os.Getenv("GIN_MODE") != "release" {
+		bucket = s.keys["debug"]
+	}
+	zs := s.redis.ZRangeByScore(s.ctx, bucket, &redis.ZRangeBy{
 		Min: fmt.Sprintf("%d", start),
 		Max: fmt.Sprintf("%d", end),
 	})
@@ -98,5 +108,5 @@ func (s *Storage) Search(start, end int64) []DBBabyEvent {
 }
 
 func (s *Storage) Erase() {
-	s.redis.FlushDB(s.ctx)
+	s.redis.Del(s.ctx, s.keys["debug"])
 }
