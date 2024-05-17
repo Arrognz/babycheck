@@ -62,11 +62,11 @@ func NewStorage() *Storage {
 	return st
 }
 
-func (s *Storage) Update(action string, time time.Time) bool {
+func (s *Storage) Update(action string, ts time.Time) bool {
 	uuid := uuid.New().String()
 	dbEvent := &DBBabyEvent{
 		ID:        uuid,
-		Timestamp: time.Unix(),
+		Timestamp: ts.UnixMilli(),
 		Name:      action,
 		Author:    "None",
 	}
@@ -76,7 +76,7 @@ func (s *Storage) Update(action string, time time.Time) bool {
 		return false
 	}
 	zData := redis.Z{
-		Score:  float64(time.UnixMilli()),
+		Score:  float64(ts.UnixMilli()),
 		Member: jsonEvent,
 	}
 	// if GIN_MODE is not release, use debug bucket
@@ -109,4 +109,14 @@ func (s *Storage) Search(start, end int64) []DBBabyEvent {
 
 func (s *Storage) Erase() {
 	s.redis.Del(s.ctx, s.keys["debug"])
+}
+
+func (s *Storage) Delete(event int64) bool {
+	// if GIN_MODE is not release, use debug bucket
+	if os.Getenv("GIN_MODE") != "release" {
+		s.redis.ZRemRangeByScore(s.ctx, s.keys["debug"], fmt.Sprintf("%d", event-1000), fmt.Sprintf("%d", event+1000))
+	} else {
+		s.redis.ZRemRangeByScore(s.ctx, s.keys["babycheck"], fmt.Sprintf("%d", event-1000), fmt.Sprintf("%d", event+1000))
+	}
+	return true
 }

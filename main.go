@@ -75,6 +75,29 @@ func search(c *gin.Context) {
 	})
 }
 
+type DeleteAction struct {
+	Timestamp int64 `json:"timestamp"`
+}
+
+func deleteAction(c *gin.Context) {
+	payload := DeleteAction{}
+	err := c.BindJSON(&payload)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid json",
+		})
+		return
+	}
+	tmp, _ := c.Get("storage")
+	store := tmp.(*storage.Storage)
+	ok := store.Delete(payload.Timestamp)
+	c.JSON(http.StatusOK, gin.H{
+		"action":  action,
+		"deleted": ok,
+		"ok":      ok,
+	})
+}
+
 func main() {
 	port := os.Getenv("PORT")
 
@@ -120,6 +143,7 @@ func main() {
 		api.GET("/ping", pong)
 		api.POST("/search", search)
 		api.POST("/remote/:action", action)
+		api.DELETE("/remote", deleteAction)
 	}
 	if os.Getenv("GIN_MODE") != "release" {
 		api.GET("/reset", func(c *gin.Context) {

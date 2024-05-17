@@ -47,6 +47,23 @@ class Api {
             return {};
         }
     }
+
+    async delete(eventTs) {
+        try {
+            const response = await fetch(`${this.baseUrl}/remote`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ timestamp: eventTs })
+            });
+            const body = await response.json();
+            return body;
+        } catch (e) {
+            console.error(e);
+            return {};
+        }
+    }
 }
 
 const api = new Api();
