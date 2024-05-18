@@ -61,7 +61,7 @@
   width: 90%;
   min-height: 70vh;
   max-height: 70vh;
-  overflow: hidden;
+  overflow: scroll;
 }
 
 .actions-container {
@@ -121,7 +121,7 @@
 .pee-button {
   padding: 12px;
   background: rgb(44, 135, 44);
-  color: goldenrod;
+  color: yellow;
   width: 6vw;
   height: 100%;
   display: flex;
@@ -132,7 +132,7 @@
 .poo-button {
   padding: 12px;
   background: rgb(44, 135, 44);
-  color: brown;
+  color: goldenrod;
   width: 6vw;
   height: 100%;
   display: flex;
@@ -148,7 +148,6 @@
 }
 
 .timeline {
-  background: darkgrey;
   height: 10vh;
   flex-grow: 1;
   border-radius: 1vw;
@@ -159,6 +158,11 @@
 
 .timeline-event {
   background: dodgerblue;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px;
 }
 
 .timeline-state {

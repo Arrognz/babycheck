@@ -9,7 +9,7 @@ import Timer from './Timer';
 
 
 const map = {
-  undefined: 'Ne fais rien',
+  undefined: 'Ne fait rien',
   'sleep': 'Dort',
   'leftBoob': 'Mange',
   'rightBoob': 'Mange',
@@ -92,9 +92,9 @@ function App() {
         {/* grid for buttons, two columns max */}
         <div className={gridClass}>
           <div className={sleepClass} onClick={() => {remote('sleep')}}>
-            <span>{isSleeping?'Sommeil':'Eveil'}</span><br/>
-            {isSleeping && <><FontAwesomeIcon icon={faMoon} fontSize={20} /></>}
-            {!isSleeping && <><FontAwesomeIcon icon={faSun} fontSize={20} /></>}
+            <span>{isSleeping?'Reveil':'Dodo'}</span><br/>
+            {isSleeping && <><FontAwesomeIcon icon={faMoon} fontSize={20} label={'dort depuis'} /></>}
+            {!isSleeping && <><FontAwesomeIcon icon={faSun} fontSize={20} label={'éveil depuis'} /></>}
             {last && <Timer from={last.timestamp} interval={5000}/>}
           </div>
           <div className="spacer" />

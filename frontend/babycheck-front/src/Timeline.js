@@ -71,6 +71,7 @@ export default function Timeline(props) {
                         className="timeline-event"
                         style={{ left: `${left}%` }}
                         onContextMenu={(e) => {
+                            e.preventDefault();
                             setModalEvent(event)
                             setShowModal(true)
                         }}

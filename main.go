@@ -105,6 +105,27 @@ func getMode(c *gin.Context) {
 	})
 }
 
+func changeTimestamp(c *gin.Context) {
+	payload := struct {
+		Event storage.DBBabyEvent `json:"event"`
+		Ts    int64               `json:"ts"`
+	}{}
+	err := c.BindJSON(&payload)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid json",
+		})
+		return
+	}
+	tmp, _ := c.Get("storage")
+	store := tmp.(*storage.Storage)
+	ok := store.ChangeTimestamp(payload.Event, payload.Ts)
+	c.JSON(http.StatusOK, gin.H{
+		"action":  action,
+		"changed": ok,
+	})
+}
+
 func main() {
 	port := os.Getenv("PORT")
 
@@ -150,6 +171,7 @@ func main() {
 		api.GET("/ping", pong)
 		api.POST("/search", search)
 		api.POST("/remote/:action", action)
+		api.POST("/remote/update", changeTimestamp)
 		api.DELETE("/remote", deleteAction)
 		api.GET("/mode", getMode)
 	}

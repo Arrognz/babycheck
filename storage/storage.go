@@ -96,7 +96,7 @@ func (s *Storage) Update(action string, ts time.Time) bool {
 		wakeEvent := &DBBabyEvent{
 			ID: uuid.New().String(),
 			// Add 1ms to avoid conflicts
-			Timestamp: lastEvent.Timestamp - 1000,
+			Timestamp: time.Now().UnixMilli() - 1000,
 			Name:      "wake",
 			Author:    "None",
 		}
@@ -154,12 +154,37 @@ func (s *Storage) Erase() {
 	s.redis.Del(s.ctx, s.keys["debug"])
 }
 
-func (s *Storage) Delete(event int64) bool {
+func (s *Storage) ChangeTimestamp(event DBBabyEvent, newTimestamp int64) bool {
+	// need to create a copy and remote the old one
+	newEvent := event
+	newEvent.Timestamp = newTimestamp
+	jsonEvent, err := newEvent.Json()
+	if err != nil {
+		fmt.Printf("Failed to marshal event: %+v\n", err)
+		return false
+	}
+	bucket := s.keys["babyevents"]
 	// if GIN_MODE is not release, use debug bucket
 	if os.Getenv("GIN_MODE") != "release" {
-		s.redis.ZRemRangeByScore(s.ctx, s.keys["debug"], fmt.Sprintf("%d", event-1000), fmt.Sprintf("%d", event+1000))
-	} else {
-		s.redis.ZRemRangeByScore(s.ctx, s.keys["babycheck"], fmt.Sprintf("%d", event-1000), fmt.Sprintf("%d", event+1000))
+		bucket = s.keys["debug"]
 	}
+
+	// remove the old event
+	s.Delete(event.Timestamp)
+	zData := redis.Z{
+		Score:  float64(newTimestamp),
+		Member: jsonEvent,
+	}
+	s.redis.ZAdd(s.ctx, bucket, zData)
 	return true
+}
+
+func (s *Storage) Delete(event int64) bool {
+	// if GIN_MODE is not release, use debug bucket
+	bucket := s.keys["babyevents"]
+	if os.Getenv("GIN_MODE") != "release" {
+		bucket = s.keys["debug"]
+	}
+	res := s.redis.ZRemRangeByScore(s.ctx, bucket, fmt.Sprintf("%d", event-100), fmt.Sprintf("%d", event+100))
+	return res.Val() == 0
 }
