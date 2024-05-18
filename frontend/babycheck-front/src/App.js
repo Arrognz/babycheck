@@ -4,14 +4,15 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import Api from './api/Api';
 import './App.css';
 import Timeline from './Timeline';
-import { faBed } from '@fortawesome/free-solid-svg-icons'
+import { faBed, faDroplet, faMoon, faPersonBreastfeeding, faPoo, faSun } from '@fortawesome/free-solid-svg-icons'
+import Timer from './Timer';
 
 
 const map = {
   undefined: 'Ne fais rien',
   'sleep': 'Dort',
-  'leftBoobStart': 'Mange',
-  'rightBoobStart': 'Mange',
+  'leftBoob': 'Mange',
+  'rightBoob': 'Mange',
   'wake': 'Est éveillé',
   'crying': 'Pleure',
 }
@@ -32,45 +33,88 @@ function App() {
     const response = await Api.remote(action);
     if (response.ok) {
       setBabystate(action);
-      // setLastChange(response.lastChange);
+      setLastChange(response.lastChange);
     }
   }
+  // api search from now - 6 hours to now
+  const fetchData = React.useCallback(async () => {
+    // await 2s
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const response = await Api.search(new Date().getTime() - 24*60*60*1000, new Date().getTime());
+    setEvents(response.events);
+    const last = response.events[response.events.length - 1];
+    if (last && last.name !== babystate) {
+      setBabystate(last.name);
+      setLastChange(last.timestamp);
+    }
+  });
 
   useEffect(() => {
-    // api search from now - 6 hours to now
-    const fetchData = async () => {
-      // await 2s
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      const response = await Api.search(new Date().getTime() - 6*60*60*1000, new Date().getTime());
-      setEvents(response.events);
-    };
     fetchData();
-  }, [babystate]);
-  let gridClass = "grid-container";
+  }, [babystate, fetchData]);
+  let gridClass = "actions-container";
+  let sleepClass = "sleep-button";
+  const isSleeping = babystate === 'sleep';
+  if (isSleeping) {
+    sleepClass = "sleep-button sleeping";
+  }
+  const isLeftBoob = babystate === 'leftBoob';
+  let leftClass = "left-button";
+  if (isLeftBoob) {
+    leftClass = "left-button active";
+  }
+  const isRightBoob = babystate === 'rightBoob';
+  let rightClass = "right-button";
+  if (isRightBoob) {
+    rightClass = "right-button active";
+  }
+
+  let peeClass = "pee-button";
+  let pooClass = "poo-button";
+
+  const lastSleep = events.filter(e => e.name === 'sleep').pop();
+  const lastWake = events.filter(e => e.name === 'wake').pop();
 
   return (
     <div className="App">
       <header className="App-header">
-        <div style={{ position: 'absolute', fontSize: '8px', top: 3, right: 3, color: 'white' }}>
+        <div style={{ position: 'absolute', fontSize: '8px', top: 3, right: 3, color: 'grey' }}>
           {mode}
         </div>
-        <h1>Pacôme</h1>
-        <Timeline 
+        <h1 onClick={() => { fetchData() }}>Pacôme {map[babystate]}</h1>
+        <Timeline
           events={events} 
-          start={new Date().getTime() - 6*60*60*1000} 
+          start={new Date().getTime() - 24*60*60*1000} 
           stop={new Date().getTime()}
         />
         {/* grid for buttons, two columns max */}
         <div className={gridClass}>
-          <button className="grid-item" onClick={() => {remote('sleep')}}>S'endort</button>
-          <button className="grid-item" onClick={() => {remote('wake')}}>Se reveille</button>
-          <button className="grid-item" onClick={() => {remote('crying')}}>Pleure fort</button>
-          <button className="grid-item" onClick={() => {remote('leftBoobStart')}}>Sein gauche (début)</button>
-          <button className="grid-item" onClick={() => {remote('rightBoobStart')}}>Sein droit (début)</button>
-          <button className="grid-item" onClick={() => {remote('pee')}}><img src="pee.png" height={24} /></button>
-          <button className="grid-item" onClick={() => {remote('leftBoobStop')}}>Sein gauche (fin)</button>
-          <button className="grid-item" onClick={() => {remote('rightBoobStop')}}>Sein droit (fin)</button>
-          <button className="grid-item" onClick={() => {remote('poop')}}><img src="poop.png" height={24} /></button>
+          <div className={sleepClass} onClick={() => {remote('sleep')}}>
+            <span>{isSleeping?'Sommeil':'Eveil'}</span><br/>
+            {isSleeping && <><FontAwesomeIcon icon={faMoon} fontSize={20} /></>}
+            {!isSleeping && <><FontAwesomeIcon icon={faSun} fontSize={20} /></>}
+            <Timer from={isSleeping ? lastSleep.timestamp : lastWake.timestamp} interval={5000}/>
+          </div>
+          <div className="spacer" />
+          <div className={leftClass} onClick={() => {remote('leftBoob')}}>
+          <span>G</span><br/>
+            {isLeftBoob && <><FontAwesomeIcon icon={faPersonBreastfeeding} fontSize={20} /></>}
+            {!isLeftBoob && <><FontAwesomeIcon icon={faPersonBreastfeeding} fontSize={20} /></>}
+            {isLeftBoob && <Timer from={lastChange} interval={5000} label={''}/>}
+          </div>
+          <div className={rightClass} onClick={() => {remote('rightBoob')}}>
+            <span>D</span><br/>
+            {isRightBoob && <><FontAwesomeIcon icon={faPersonBreastfeeding} fontSize={20} /></>}
+            {!isRightBoob && <><FontAwesomeIcon icon={faPersonBreastfeeding} fontSize={20} /></>}
+            {isRightBoob && <Timer from={lastChange} interval={5000} label={''}/>}
+          </div>
+          <div className="spacer" />
+          <div className={peeClass} onClick={() => {remote('pee')}}>
+            <FontAwesomeIcon icon={faDroplet} fontSize={20} />
+          </div>
+          <div className={pooClass} onClick={() => {remote('poop')}}>
+            <FontAwesomeIcon icon={faPoo} fontSize={20} />
+          </div>
         </div>
       </header>
     </div>

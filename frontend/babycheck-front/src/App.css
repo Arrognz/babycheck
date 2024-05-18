@@ -20,7 +20,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding-top: 10vh;
+  padding-top: 2vh;
   font-size: calc(10px + 2vmin);
   color: white;
 }
@@ -58,12 +58,93 @@
 }
 
 .timeline-container {
+  width: 90%;
+  min-height: 70vh;
+  max-height: 70vh;
+  overflow: hidden;
+}
+
+.actions-container {
+  width: 100%;
+  height: 6vh;
+  position: absolute;
+  bottom: 3vh;
   display: flex;
-  flex-direction: row;
-  justify-content: space-between;
   align-items: center;
-  width: 70%;
-  gap: 8px;
+  justify-content: space-evenly;
+  gap:1px;
+  box-sizing: border-box;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.actions-container > div {
+  border-radius: 4px;
+}
+
+.actions-container .spacer {
+  flex-grow: 1;
+}
+
+.sleep-button {
+  padding: 12px;
+  background: goldenrod;
+  color: darkblue;
+  width: fit-content;
+  height: 100%;
+}
+
+.left-button {
+  padding: 12px;
+  background: pink;
+  color: white;
+  width: fit-content;
+  min-width: 10%;
+  margin-right: 10px;
+  height: 100%;
+}
+
+.right-button {
+  padding: 12px;
+  background: pink;
+  color: white;
+  width: fit-content;
+  min-width: 10%;
+  height: 100%;
+}
+
+.right-button svg {
+  /* flip horizontally */
+  transform: scaleX(-1);
+}
+
+.pee-button {
+  padding: 12px;
+  background: rgb(44, 135, 44);
+  color: goldenrod;
+  width: 6vw;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.poo-button {
+  padding: 12px;
+  background: rgb(44, 135, 44);
+  color: brown;
+  width: 6vw;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sleep-button.sleeping {
+  padding: 12px;
+  background: darkblue;
+  color: goldenrod;
+  width: fit-content;
 }
 
 .timeline {

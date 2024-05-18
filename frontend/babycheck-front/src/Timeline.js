@@ -19,22 +19,12 @@ function formatDate(date) {
     return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function toHHMM(duration) {
-    const hours = Math.floor(duration / 3600);
-    const minutes = Math.floor((duration - hours * 3600) / 60);
-    const pad = (n) => n < 10 ? `0${n}` : n;
-    if (hours > 0) {
-        return `${hours}h${pad(minutes)}m`;
-    }
-    return `${minutes}m`;
-}
-
 const labelMap = {
     'poop': 'Caca',
     'pee': 'Pipi',
     'sleep': 'Dort',
-    'leftBoobStart': 'Tête sein gauche',
-    'rightBoobStart': 'Tête sein droit',
+    'leftBoob': 'Tête sein gauche',
+    'rightBoob': 'Tête sein droit',
     'leftBoobStop': 'Lâche sein gauche',
     'rightBoobStop': 'Lâche sein droit',
     'crying': 'Pleure',

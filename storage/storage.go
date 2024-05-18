@@ -64,6 +64,30 @@ func NewStorage() *Storage {
 
 func (s *Storage) Update(action string, ts time.Time) bool {
 	uuid := uuid.New().String()
+	bucket := s.keys["babyevents"]
+	if os.Getenv("GIN_MODE") != "release" {
+		bucket = s.keys["debug"]
+	}
+	lastEventRes := s.redis.ZRevRangeByScore(s.ctx, bucket, &redis.ZRangeBy{
+		Min:    "-inf",
+		Max:    "+inf",
+		Offset: 0,
+		Count:  1,
+	})
+	lastEvent := DBBabyEvent{}
+	if len(lastEventRes.Val()) > 0 {
+		json.Unmarshal([]byte(lastEventRes.Val()[0]), &lastEvent)
+	}
+
+	// if sleeping and receive sleep event, transform to wake
+	if action == "sleep" && lastEvent.Name == "sleep" {
+		action = "wake"
+	}
+	// if eating (leftBoob or rightBoob) and last event was eating, add stop
+	if (action == "leftBoob" || action == "rightBoob") && (lastEvent.Name == "leftBoob" || lastEvent.Name == "rightBoob") {
+		action += "Stop"
+	}
+
 	dbEvent := &DBBabyEvent{
 		ID:        uuid,
 		Timestamp: ts.UnixMilli(),
