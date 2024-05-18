@@ -98,6 +98,13 @@ func deleteAction(c *gin.Context) {
 	})
 }
 
+func getMode(c *gin.Context) {
+	mode := os.Getenv("GIN_MODE")
+	c.JSON(http.StatusOK, gin.H{
+		"mode": mode,
+	})
+}
+
 func main() {
 	port := os.Getenv("PORT")
 
@@ -144,6 +151,7 @@ func main() {
 		api.POST("/search", search)
 		api.POST("/remote/:action", action)
 		api.DELETE("/remote", deleteAction)
+		api.GET("/mode", getMode)
 	}
 	if os.Getenv("GIN_MODE") != "release" {
 		api.GET("/reset", func(c *gin.Context) {

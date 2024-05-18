@@ -64,6 +64,18 @@ class Api {
             return {};
         }
     }
+
+    async getMode() {
+        try {
+            const response = await fetch(`${this.baseUrl}/mode`);
+            const body = await response.json();
+            return body;
+        } catch (e) {
+            console.error(e);
+            return {};
+        }
+    
+    }
 }
 
 const api = new Api();

@@ -20,6 +20,13 @@ function App() {
   const [babystate, setBabystate] = useState(undefined);
   const [lastChange, setLastChange] = useState(undefined);
   const [events, setEvents] = useState([]);
+  const [mode, setMode] = useState('');
+
+  useEffect(() => { 
+    Api.getMode().then((response) => { 
+      setMode(response.mode);
+    })
+  }, []);
 
   const remote = async (action) => {
     const response = await Api.remote(action);
@@ -44,6 +51,9 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
+        <div style={{ position: 'absolute', fontSize: '8px', top: 3, right: 3, color: 'white' }}>
+          {mode}
+        </div>
         <h1>Pacôme</h1>
         <Timeline 
           events={events} 
