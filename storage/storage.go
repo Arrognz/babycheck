@@ -63,7 +63,7 @@ func NewStorage() *Storage {
 }
 
 func (s *Storage) Update(action string, ts time.Time) bool {
-	uuid := uuid.New().String()
+	id := uuid.New().String()
 	bucket := s.keys["babyevents"]
 	if os.Getenv("GIN_MODE") != "release" {
 		bucket = s.keys["debug"]
@@ -84,12 +84,36 @@ func (s *Storage) Update(action string, ts time.Time) bool {
 		action = "wake"
 	}
 	// if eating (leftBoob or rightBoob) and last event was eating, add stop
-	if (action == "leftBoob" || action == "rightBoob") && (lastEvent.Name == "leftBoob" || lastEvent.Name == "rightBoob") {
+	if (action == "leftBoob") && (lastEvent.Name == "leftBoob") {
 		action += "Stop"
+	}
+	if (action == "rightBoob") && (lastEvent.Name == "rightBoob") {
+		action += "Stop"
+	}
+	// if eating (leftBoob or rightBoob) and last event was sleeping, wake up
+	if (action == "leftBoob" || action == "rightBoob") && (lastEvent.Name == "sleep") {
+		// Add a wake action
+		wakeEvent := &DBBabyEvent{
+			ID: uuid.New().String(),
+			// Add 1ms to avoid conflicts
+			Timestamp: lastEvent.Timestamp - 1000,
+			Name:      "wake",
+			Author:    "None",
+		}
+		jsonWakeEvent, err := wakeEvent.Json()
+		if err != nil {
+			fmt.Printf("Failed to marshal event: %+v\n", err)
+			return false
+		}
+		zWakeData := redis.Z{
+			Score:  float64(wakeEvent.Timestamp),
+			Member: jsonWakeEvent,
+		}
+		s.redis.ZAdd(s.ctx, bucket, zWakeData)
 	}
 
 	dbEvent := &DBBabyEvent{
-		ID:        uuid,
+		ID:        id,
 		Timestamp: ts.UnixMilli(),
 		Name:      action,
 		Author:    "None",
@@ -103,12 +127,7 @@ func (s *Storage) Update(action string, ts time.Time) bool {
 		Score:  float64(ts.UnixMilli()),
 		Member: jsonEvent,
 	}
-	// if GIN_MODE is not release, use debug bucket
-	if os.Getenv("GIN_MODE") != "release" {
-		s.redis.ZAdd(s.ctx, s.keys["debug"], zData)
-	} else {
-		s.redis.ZAdd(s.ctx, s.keys["babyevents"], zData)
-	}
+	s.redis.ZAdd(s.ctx, bucket, zData)
 	return true
 }
 

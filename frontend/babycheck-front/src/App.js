@@ -33,7 +33,8 @@ function App() {
     const response = await Api.remote(action);
     if (response.ok) {
       setBabystate(action);
-      setLastChange(response.lastChange);
+      setLastChange(Date.now());
+      fetchData();
     }
   }
   // api search from now - 6 hours to now
@@ -41,7 +42,7 @@ function App() {
     // await 2s
     await new Promise(resolve => setTimeout(resolve, 500));
     const response = await Api.search(new Date().getTime() - 24*60*60*1000, new Date().getTime());
-    setEvents(response.events);
+    setEvents(response.events || []);
     const last = response.events[response.events.length - 1];
     if (last && last.name !== babystate) {
       setBabystate(last.name);
@@ -51,7 +52,7 @@ function App() {
 
   useEffect(() => {
     fetchData();
-  }, [babystate, fetchData]);
+  }, []);
   let gridClass = "actions-container";
   let sleepClass = "sleep-button";
   const isSleeping = babystate === 'sleep';
@@ -74,14 +75,15 @@ function App() {
 
   const lastSleep = events.filter(e => e.name === 'sleep').pop();
   const lastWake = events.filter(e => e.name === 'wake').pop();
-
+  const last = lastSleep && lastWake && lastSleep.timestamp > lastWake.timestamp ? lastSleep : lastWake;
+  
   return (
     <div className="App">
       <header className="App-header">
         <div style={{ position: 'absolute', fontSize: '8px', top: 3, right: 3, color: 'grey' }}>
           {mode}
         </div>
-        <h1 onClick={() => { fetchData() }}>Pacôme {map[babystate]}</h1>
+        <h1>Pacôme {map[babystate]}</h1>
         <Timeline
           events={events} 
           start={new Date().getTime() - 24*60*60*1000} 
@@ -93,7 +95,7 @@ function App() {
             <span>{isSleeping?'Sommeil':'Eveil'}</span><br/>
             {isSleeping && <><FontAwesomeIcon icon={faMoon} fontSize={20} /></>}
             {!isSleeping && <><FontAwesomeIcon icon={faSun} fontSize={20} /></>}
-            <Timer from={isSleeping ? lastSleep.timestamp : lastWake.timestamp} interval={5000}/>
+            {last && <Timer from={last.timestamp} interval={5000}/>}
           </div>
           <div className="spacer" />
           <div className={leftClass} onClick={() => {remote('leftBoob')}}>
