@@ -76,6 +76,24 @@ class Api {
         }
     
     }
+
+    async add(action, timestamp) {
+        try {
+            const response = await fetch(`${this.baseUrl}/add`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ action, timestamp })
+            });
+            const body = await response.json();
+            return body;
+        } catch (e) {
+            console.error(e);
+            return {};
+        }
+    
+    }
 }
 
 const api = new Api();

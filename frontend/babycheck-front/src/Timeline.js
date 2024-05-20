@@ -7,14 +7,24 @@ import Api from './api/Api';
     // name
 // }
 
+export function roundDate(date, multipleOf = 5) {
+    // rounds a date to the nearest 5 minutes
+    const d = new Date(date);
+    const minutes = d.getMinutes();
+    const rounded = Math.round(minutes / multipleOf) * multipleOf;
+    d.setMinutes(rounded);
+    return d;
+
+}
+
 // enrich strings
-function formatDate(date) {
+export function formatDate(date) {
     // transforms a timestamp into the format:
     // DD/MM HH:MM if the timestamp is from yesterday or before
     // Otherwise, if today, HH:MM
 
+    
     const d = new Date(date);
-    const now = new Date();
     const pad = (n) => n < 10 ? `0${n}` : n;
     return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
@@ -49,7 +59,7 @@ export default function Timeline(props) {
                 <div className="modal-content">
                     <span className="close" onClick={() => setShowModal(false)}>&times;</span>
                     <h2>{labelMap[modalEvent.name]}</h2>
-                    <p>{formatDate(modalEvent.timestamp)}</p>
+                    {<input type="time" value={modalEvent.timestamp}/>}
                     <button onClick={async () => { 
                         // delete event
                         Api.delete(modalEvent.timestamp);

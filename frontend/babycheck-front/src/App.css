@@ -76,14 +76,30 @@
   box-sizing: border-box;
   padding-left: 12px;
   padding-right: 12px;
+  flex-direction: row;
 }
 
+.addActions-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.addActions-container > div,
 .actions-container > div {
   border-radius: 4px;
 }
 
 .actions-container .spacer {
   flex-grow: 1;
+}
+
+.button {
+  padding: 12px;
+  background: dodgerblue;
+  color: white;
+  border-radius: 8px;
+  margin: 12px;
 }
 
 .sleep-button {
@@ -147,6 +163,14 @@
   width: fit-content;
 }
 
+.add-button { 
+  padding: 12px;
+  background: dodgerblue;
+  color: white;
+  font-weight: bold;
+  width: fit-content;
+}
+
 .timeline {
   height: 10vh;
   flex-grow: 1;
@@ -175,10 +199,39 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
-  background-color: darkcyan;
+  bottom: 0px;
+  transform: translate(-50%, 0);
+  background-color: #373737;
   padding: 20px;
-  border: 1px solid #888;
-  width: 80%;
+  border-top: 3px solid greenyellow;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  width: 90%;
   overflow: auto;
+  animation: rise-from-bottom 0.5s ease-in-out;
+  z-index: 100000;
+}
+
+.modal.closed {
+  animation: lower-to-bottom 0.5s ease-in-out;
+}
+
+@keyframes rise-from-bottom {
+  from {
+    top: 100%;
+  }
+  to {
+    top: 50%;
+  }
+}
+
+@keyframes lower-to-bottom {
+  from {
+    top: 50%;
+    opacity: 1;
+  }
+  to {
+    top: 100%;
+    opacity: 0;
+  }
 }

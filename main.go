@@ -75,6 +75,27 @@ func search(c *gin.Context) {
 	})
 }
 
+func AddAction(c *gin.Context) {
+	var action struct {
+		Name string `json:"action"`
+		Time int64  `json:"timestamp"`
+	}
+	err := c.BindJSON(&action)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid json",
+		})
+		return
+	}
+	tmp, _ := c.Get("storage")
+	store := tmp.(*storage.Storage)
+	ok := store.Save(action.Time, action.Name)
+	c.JSON(http.StatusOK, gin.H{
+		"action": action,
+		"ok":     ok,
+	})
+}
+
 type DeleteAction struct {
 	Timestamp int64 `json:"timestamp"`
 }
@@ -172,6 +193,7 @@ func main() {
 		api.POST("/search", search)
 		api.POST("/remote/:action", action)
 		api.POST("/remote/update", changeTimestamp)
+		api.POST("/add", AddAction)
 		api.DELETE("/remote", deleteAction)
 		api.GET("/mode", getMode)
 	}

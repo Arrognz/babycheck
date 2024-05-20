@@ -62,6 +62,30 @@ func NewStorage() *Storage {
 	return st
 }
 
+func (s *Storage) Save(timestamp int64, name string) bool {
+	id := uuid.New().String()
+	dbEvent := &DBBabyEvent{
+		ID:        id,
+		Timestamp: timestamp,
+		Name:      name,
+	}
+	jsonEvent, err := dbEvent.Json()
+	if err != nil {
+		fmt.Printf("Failed to marshal event: %+v\n", err)
+		return false
+	}
+	bucket := s.keys["babyevents"]
+	if os.Getenv("GIN_MODE") != "release" {
+		bucket = s.keys["debug"]
+	}
+	zData := redis.Z{
+		Score:  float64(timestamp),
+		Member: jsonEvent,
+	}
+	s.redis.ZAdd(s.ctx, bucket, zData)
+	return true
+}
+
 func (s *Storage) Update(action string, ts time.Time) bool {
 	id := uuid.New().String()
 	bucket := s.keys["babyevents"]
