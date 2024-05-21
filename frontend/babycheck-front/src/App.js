@@ -15,7 +15,7 @@ import {
   faTimes,
   faTimesCircle,
 } from "@fortawesome/free-solid-svg-icons";
-import Timer from "./Timer";
+import Timer, { toHHMM } from "./Timer";
 import { formatDate } from "./Timeline";
 import DelaySelector from "./DelaySelector";
 
@@ -45,7 +45,9 @@ function App() {
 
   // action form
   const [addAction, setAddAction] = useState("sleep");
-  const [addActionTime, setAddActionTime] = useState(Date.now() - 5 * 60 * 1000);
+  const [addActionTime, setAddActionTime] = useState(
+    Date.now() - 5 * 60 * 1000
+  );
   const [showDuration, setShowDuration] = useState(false);
   const [addActionDuration, setAddActionDuration] = useState(5);
   const [addOtherAction, setAddOtherAction] = useState(undefined);
@@ -59,9 +61,9 @@ function App() {
   const save = async (action, timestamp) => {
     const response = await Api.add(action, timestamp);
     if (response.ok) {
-      console.log('saved');
+      console.log("saved");
     }
-  }
+  };
 
   const remote = async (action) => {
     const response = await Api.remote(action);
@@ -123,14 +125,91 @@ function App() {
   let validateLabel = "";
   if (addAction && addActionTime && !showDuration) {
     validateLabel = `Ajouter ${map[addAction]} à ${formatDate(addActionTime)}`;
-  } else if (addAction && addActionTime && addActionTime.getTime && addActionDuration) {
-    validateLabel = `Ajouter ${map[addAction]} de ${formatDate(addActionTime)} à ${formatDate(new Date(addActionTime.getTime() + addActionDuration * 60 * 1000))}`;
+  } else if (
+    addAction &&
+    addActionTime &&
+    addActionTime.getTime &&
+    addActionDuration
+  ) {
+    validateLabel = `Ajouter ${map[addAction]} de ${formatDate(
+      addActionTime
+    )} à ${formatDate(
+      new Date(addActionTime.getTime() + addActionDuration * 60 * 1000)
+    )}`;
+  }
+
+  // sum sleep events
+  let _isSleeping = false;
+  let _sleepTime = 0;
+  let _lastSleepStart = 0;
+  let _leftBoobCount = 0;
+  let _rightBoobCount = 0;
+  let _lastLeftBoob = 0;
+  let _lastRightBoob = 0;
+  let _leftBoobDuration = 0;
+  let _rightBoobDuration = 0;
+  let peeCount = 0;
+  let poopCount = 0;
+  for (let i = 0; i < events.length; i++) {
+    if (events[i].name === "sleep") {
+      _isSleeping = true;
+      _lastSleepStart = events[i].timestamp;
+    }
+    if (
+      [
+        "wake",
+        "pee",
+        "poop",
+        "leftBoob",
+        "rightBoob",
+        "leftBoobStop",
+        "rightBoobStop",
+      ].includes(events[i].name) &&
+      _isSleeping
+    ) {
+      _isSleeping = false;
+      _sleepTime += events[i].timestamp - _lastSleepStart;
+    }
+    if (events[i].name === "leftBoob") {
+      _leftBoobCount++;
+      _lastLeftBoob = events[i].timestamp;
+    }
+    if (events[i].name === "rightBoob") {
+      _rightBoobCount++;
+      _lastRightBoob = events[i].timestamp;
+    }
+    if (events[i].name === "leftBoobStop") {
+      _leftBoobDuration += events[i].timestamp - _lastLeftBoob;
+    }
+    if (events[i].name === "rightBoobStop") {
+      _rightBoobDuration += events[i].timestamp - _lastRightBoob;
+    }
+    if (events[i].name === "pee") {
+      peeCount++;
+    }
+    if (events[i].name === "poop") {
+      poopCount++;
+    }
   }
 
   return (
     <div className="App">
       <header className="App-header">
         <h1>Pacôme {map[babystate]}</h1>
+        <div style={{ fontSize: "12px", padding: '2px', margin: "2px" }}>
+          <div>{toHHMM(_sleepTime / 1000)} de sommeil depuis 24h</div>
+          <div>
+            {_leftBoobCount} fois au sein gauche (
+            {toHHMM(_leftBoobDuration / 1000)} au total)
+          </div>
+          <div>
+            {_rightBoobCount} fois au sein droit (
+            {toHHMM(_rightBoobDuration / 1000)} au total)
+          </div>
+          <div>
+            {peeCount} pipis et {poopCount} cacas
+          </div>
+        </div>
         {showAddModal && (
           <div className={modalClass}>
             <div>
@@ -267,7 +346,8 @@ function App() {
                 setAddActionTime(value);
               }}
             />
-            <br /><br/>
+            <br />
+            <br />
             {showDuration && (
               <>
                 <DelaySelector
@@ -278,22 +358,31 @@ function App() {
                   durationMode
                   value={addActionDuration}
                   showTimeAfter
-                  start={(addActionTime?.getTime && addActionTime.getTime()) || Date.now()}
+                  start={
+                    (addActionTime?.getTime && addActionTime.getTime()) ||
+                    Date.now()
+                  }
                   onChange={(val) => {
                     setAddActionDuration(val);
                   }}
                 />
               </>
             )}
-            <div className="button" onClick={async () => { 
-               if (addAction && addActionTime) {
+            <div
+              className="button"
+              onClick={async () => {
+                if (addAction && addActionTime) {
                   await save(addAction, addActionTime.getTime());
                   if (addActionDuration && addOtherAction) {
-                    await save(addOtherAction, addActionTime.getTime() + addActionDuration * 60 * 1000);
+                    await save(
+                      addOtherAction,
+                      addActionTime.getTime() + addActionDuration * 60 * 1000
+                    );
                   }
                   fetchData();
-               }
-            }}>
+                }
+              }}
+            >
               {validateLabel}
             </div>
           </div>
@@ -336,6 +425,7 @@ function App() {
           <div className="spacer" />
           <div
             className={leftClass}
+            style={_lastLeftBoob < _lastRightBoob ? { border: "2px dashed crimson" } : {}}
             onClick={() => {
               remote("leftBoob");
             }}
@@ -358,6 +448,7 @@ function App() {
           </div>
           <div
             className={rightClass}
+            style={_lastLeftBoob >= _lastRightBoob ? { border: "2px dashed crimson" } : {}}
             onClick={() => {
               remote("rightBoob");
             }}

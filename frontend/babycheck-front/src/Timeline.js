@@ -58,9 +58,13 @@ export default function Timeline(props) {
             <div className="modal">
                 <div className="modal-content">
                     <span className="close" onClick={() => setShowModal(false)}>&times;</span>
-                    <h2>{labelMap[modalEvent.name]}</h2>
-                    {<input type="time" value={modalEvent.timestamp}/>}
-                    <button onClick={async () => { 
+                    <br/>
+                    <b>{labelMap[modalEvent.name]}</b> à
+                    <span style={{ margin: "2px" }}>{formatDate(modalEvent.timestamp)}</span>
+                    <br/>
+                    <button 
+                    style={{ margin: "12px" }}
+                    onClick={async () => { 
                         // delete event
                         Api.delete(modalEvent.timestamp);
                         setShowModal(false);
