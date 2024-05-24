@@ -14,6 +14,8 @@ import {
   faSun,
   faTimes,
   faTimesCircle,
+  faCircleNotch,
+  faCheckCircle,
 } from "@fortawesome/free-solid-svg-icons";
 import Timer, { toHHMM } from "./Timer";
 import { formatDate } from "./Timeline";
@@ -51,6 +53,22 @@ function App() {
   const [showDuration, setShowDuration] = useState(false);
   const [addActionDuration, setAddActionDuration] = useState(5);
   const [addOtherAction, setAddOtherAction] = useState(undefined);
+
+  // add action loading
+  const [showAddLoading, setShowAddLoading] = useState(false);
+  const [showAddIcon, setShowAddIcon] = useState(faCheckCircle);
+  const [showAddIconSpin, setShowAddIconSpin] = useState(false);
+
+
+  useEffect(() => { 
+    if (showAddModal) {
+      setAddActionTime(Date.now());
+      setAddActionDuration(5);
+      setAddAction("sleep");
+      setAddOtherAction(undefined);
+      setShowDuration(false);
+    }
+  }, [showAddModal])
 
   useEffect(() => {
     Api.getMode().then((response) => {
@@ -122,7 +140,7 @@ function App() {
   if (modalClosing) {
     modalClass = "modal closed";
   }
-  let validateLabel = "";
+  let validateLabel = `Ajouter ${map[addAction]} à ${formatDate(addActionTime)}`;
   if (addAction && addActionTime && !showDuration) {
     validateLabel = `Ajouter ${map[addAction]} à ${formatDate(addActionTime)}`;
   } else if (
@@ -146,6 +164,7 @@ function App() {
   let _rightBoobCount = 0;
   let _lastLeftBoob = 0;
   let _lastRightBoob = 0;
+  let _isEating = false;
   let _leftBoobDuration = 0;
   let _rightBoobDuration = 0;
   let peeCount = 0;
@@ -173,22 +192,36 @@ function App() {
     if (events[i].name === "leftBoob") {
       _leftBoobCount++;
       _lastLeftBoob = events[i].timestamp;
+      _isEating = true;
     }
     if (events[i].name === "rightBoob") {
       _rightBoobCount++;
       _lastRightBoob = events[i].timestamp;
+      _isEating = true;
     }
     if (events[i].name === "leftBoobStop") {
       _leftBoobDuration += events[i].timestamp - _lastLeftBoob;
+      _isEating = false;
     }
     if (events[i].name === "rightBoobStop") {
       _rightBoobDuration += events[i].timestamp - _lastRightBoob;
+      _isEating = false;
     }
     if (events[i].name === "pee") {
       peeCount++;
     }
     if (events[i].name === "poop") {
       poopCount++;
+    }
+  }
+  if (_isSleeping) {
+    _sleepTime += Date.now() - _lastSleepStart;
+  }
+  if (_isEating) {
+    if (_lastLeftBoob > _lastRightBoob) {
+      _leftBoobDuration += Date.now() - _lastLeftBoob;
+    } else {
+      _rightBoobDuration += Date.now() - _lastRightBoob;
     }
   }
 
@@ -379,11 +412,20 @@ function App() {
                       addActionTime.getTime() + addActionDuration * 60 * 1000
                     );
                   }
-                  fetchData();
+                  setShowAddLoading(true);
+                  setShowAddIconSpin(true);
+                  setShowAddIcon(faCircleNotch);
+                  await fetchData();
+                  setShowAddLoading(false);
+                  setShowAddIcon(faCheckCircle);
+                  setShowAddIconSpin(false);
+                  setTimeout(() => {
+
+                  }, 2500);
                 }
               }}
             >
-              {validateLabel}
+              {showAddLoading && <FontAwesomeIcon icon={showAddIcon} spin={showAddIconSpin} style={{ marginRight: '4px' }}/>}{validateLabel}
             </div>
           </div>
         )}

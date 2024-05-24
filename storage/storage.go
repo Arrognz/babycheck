@@ -114,8 +114,17 @@ func (s *Storage) Update(action string, ts time.Time) bool {
 	if (action == "rightBoob") && (lastEvent.Name == "rightBoob") {
 		action += "Stop"
 	}
+	addWakeAction := false
+	if (action == "pee" || action == "poo") && (lastEvent.Name == "sleep") {
+		// Add a wake action
+		addWakeAction = true
+	}
 	// if eating (leftBoob or rightBoob) and last event was sleeping, wake up
 	if (action == "leftBoob" || action == "rightBoob") && (lastEvent.Name == "sleep") {
+		addWakeAction = true
+	}
+
+	if addWakeAction {
 		// Add a wake action
 		wakeEvent := &DBBabyEvent{
 			ID: uuid.New().String(),
