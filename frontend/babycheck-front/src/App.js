@@ -46,6 +46,7 @@ function App() {
   const [mode, setMode] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [modalClosing, setModalClosing] = useState(false);
+  const [buttonStyle, setButtonStyle] = useState("normal");
 
   // action form
   const [addAction, setAddAction] = useState("sleep");
@@ -233,6 +234,11 @@ function App() {
     <div className="App">
       <header className="App-header">
         <h1>Pacôme {map[babystate]}</h1>
+        {/* <button onClick={() => { 
+          setButtonStyle(mode === 'normal' ? 'big' : 'normal');
+        }}>
+          {mode === 'normal' ? 'Mode jour' : 'Mode nuit'}
+        </button> */}
         <div style={{ fontSize: "12px", padding: '2px', margin: "2px" }}>
           <div>{toHHMM(_sleepTime / 1000)} de sommeil depuis 24h</div>
           <div>

@@ -174,8 +174,8 @@
 
 .add-button { 
   padding: 12px;
-  background: dodgerblue;
-  color: white;
+  background: darkslateblue;
+  color: lightcoral;
   font-weight: bold;
   width: fit-content;
 }
@@ -192,7 +192,8 @@
 .timeline-event {
   /* cannot select text */
   user-select: none;
-  background: dodgerblue;
+  background: darkslateblue;
+  color: lightcoral;
   border-radius: 6px;
   display: flex;
   align-items: center;
