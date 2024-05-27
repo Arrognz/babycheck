@@ -82,8 +82,9 @@ func (s *Storage) Save(timestamp int64, name string) bool {
 		Score:  float64(timestamp),
 		Member: jsonEvent,
 	}
-	s.redis.ZAdd(s.ctx, bucket, zData)
-	return true
+	res := s.redis.ZAdd(s.ctx, bucket, zData)
+	fmt.Println("Added: ", res.String())
+	return res.Val() != 0
 }
 
 func (s *Storage) Update(action string, ts time.Time) bool {
@@ -160,7 +161,8 @@ func (s *Storage) Update(action string, ts time.Time) bool {
 		Score:  float64(ts.UnixMilli()),
 		Member: jsonEvent,
 	}
-	s.redis.ZAdd(s.ctx, bucket, zData)
+	res := s.redis.ZAdd(s.ctx, bucket, zData)
+	fmt.Println("Deleted: ", res.String())
 	return true
 }
 
@@ -219,5 +221,6 @@ func (s *Storage) Delete(event int64) bool {
 		bucket = s.keys["debug"]
 	}
 	res := s.redis.ZRemRangeByScore(s.ctx, bucket, fmt.Sprintf("%d", event-100), fmt.Sprintf("%d", event+100))
+	fmt.Println("Deleted: ", res.String())
 	return res.Val() == 0
 }

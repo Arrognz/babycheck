@@ -31,23 +31,6 @@ func action(c *gin.Context) {
 	})
 }
 
-func firstMiddleware(c *gin.Context) {
-	_, exists := c.Get("storage")
-	fmt.Printf("Checking storage... %+v\n", exists)
-	if !exists {
-		store := storage.NewStorage()
-		if store == nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "failed to create storage",
-			})
-			c.Abort()
-			return
-		}
-		c.Set("storage", store)
-	}
-	c.Next()
-}
-
 func search(c *gin.Context) {
 	// start and stop are body params
 	body := struct {

@@ -280,7 +280,7 @@ function App() {
                   height: "5vh",
                 }}
               >
-                {/* <div
+                <div
                   className={"nap-button"}
                   style={
                     addAction === "nap"
@@ -294,7 +294,7 @@ function App() {
                   }}
                 >
                   <FontAwesomeIcon icon={faBed} fontSize={20} />
-                </div> */}
+                </div>
                 <div
                   className={"sleep-button sleeping"}
                   style={
@@ -431,7 +431,8 @@ function App() {
                   setShowAddIcon('circle');
                   setShowAddLoading(true);
                   setShowAddIconSpin(true);
-                  await save(addAction, addActionTime.getTime());
+                  const a = addAction === "nap" ? "sleep" : addAction;
+                  await save(a, addActionTime.getTime());
                   if (addActionDuration && addOtherAction) {
                     await save(
                       addOtherAction,
