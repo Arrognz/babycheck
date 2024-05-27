@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { formatDate, roundDate } from "./Timeline";
 
 const buttonStyle = {
@@ -11,6 +11,7 @@ const buttonStyle = {
 export default function DelaySelector(props) {
   const { step, before, after, showTimeAfter, onChange, value, durationMode, start } = props;
   const [delay, setDelay] = React.useState(5);
+
   return (
     <div style={{
         display: 'inline-flex',

@@ -16,6 +16,7 @@ import {
   faTimesCircle,
   faCircleNotch,
   faCheckCircle,
+  faCircle,
 } from "@fortawesome/free-solid-svg-icons";
 import Timer, { toHHMM } from "./Timer";
 import { formatDate } from "./Timeline";
@@ -24,6 +25,7 @@ import DelaySelector from "./DelaySelector";
 const map = {
   undefined: "Ne fait rien",
   sleep: "Dort",
+  nap: "Sieste",
   leftBoob: "Mange",
   rightBoob: "Mange",
   wake: "Est éveillé",
@@ -156,6 +158,8 @@ function App() {
     )}`;
   }
 
+
+  
   // sum sleep events
   let _isSleeping = false;
   let _sleepTime = 0;
@@ -276,6 +280,21 @@ function App() {
                   height: "5vh",
                 }}
               >
+                {/* <div
+                  className={"nap-button"}
+                  style={
+                    addAction === "nap"
+                      ? { border: "3px solid dodgerblue" }
+                      : {}
+                  }
+                  onClick={() => {
+                    setAddAction("nap");
+                    setShowDuration(true);
+                    setAddOtherAction("wake");
+                  }}
+                >
+                  <FontAwesomeIcon icon={faBed} fontSize={20} />
+                </div> */}
                 <div
                   className={"sleep-button sleeping"}
                   style={
@@ -285,6 +304,7 @@ function App() {
                   }
                   onClick={() => {
                     setAddAction("sleep");
+                    setAddOtherAction(undefined);
                   }}
                 >
                   <FontAwesomeIcon icon={faMoon} fontSize={20} />
@@ -298,6 +318,7 @@ function App() {
                   }
                   onClick={() => {
                     setAddAction("wake");
+                    setAddOtherAction(undefined);
                     setShowDuration(false);
                   }}
                 >
@@ -346,6 +367,7 @@ function App() {
                   }
                   onClick={() => {
                     setAddAction("pee");
+                    setAddOtherAction(undefined);
                     setShowDuration(false);
                   }}
                 >
@@ -360,6 +382,7 @@ function App() {
                   }
                   onClick={() => {
                     setAddAction("poop");
+                    setAddOtherAction(undefined);
                     setShowDuration(false);
                   }}
                 >
@@ -405,6 +428,9 @@ function App() {
               className="button"
               onClick={async () => {
                 if (addAction && addActionTime) {
+                  setShowAddIcon('circle');
+                  setShowAddLoading(true);
+                  setShowAddIconSpin(true);
                   await save(addAction, addActionTime.getTime());
                   if (addActionDuration && addOtherAction) {
                     await save(
@@ -412,20 +438,16 @@ function App() {
                       addActionTime.getTime() + addActionDuration * 60 * 1000
                     );
                   }
-                  setShowAddLoading(true);
-                  setShowAddIconSpin(true);
-                  setShowAddIcon(faCircleNotch);
                   await fetchData();
-                  setShowAddLoading(false);
-                  setShowAddIcon(faCheckCircle);
+                  setShowAddIcon('check');
                   setShowAddIconSpin(false);
                   setTimeout(() => {
-
+                    setShowAddLoading(false);
                   }, 2500);
                 }
               }}
             >
-              {showAddLoading && <FontAwesomeIcon icon={showAddIcon} spin={showAddIconSpin} style={{ marginRight: '4px' }}/>}{validateLabel}
+              {showAddLoading && <FontAwesomeIcon icon={showAddIcon === 'circle' ? faCircleNotch : faCheckCircle } spin={showAddIconSpin} style={{ marginRight: '4px', color: showAddIcon === 'circle' ? 'white' : 'springgreen' }}/>}{validateLabel}
             </div>
           </div>
         )}
