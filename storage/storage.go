@@ -36,7 +36,7 @@ func (e *DBBabyEvent) Json() (string, error) {
 }
 
 func NewStorage() *Storage {
-	uri := os.Getenv("REDIS_URL")
+	uri := os.Getenv("SCALINGO_REDIS_URL")
 	opts, err := redis.ParseURL(uri)
 	fmt.Println("uri: ", uri)
 	if err != nil {
