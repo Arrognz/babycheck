@@ -70,6 +70,9 @@ github.com/goccy/go-json/internal/encoder/vm_color_indent
 github.com/goccy/go-json/internal/encoder/vm_indent
 github.com/goccy/go-json/internal/errors
 github.com/goccy/go-json/internal/runtime
+# github.com/golang-jwt/jwt/v5 v5.3.0
+## explicit; go 1.21
+github.com/golang-jwt/jwt/v5
 # github.com/google/uuid v1.6.0
 ## explicit
 github.com/google/uuid
@@ -137,11 +140,13 @@ github.com/ugorji/go/codec
 # golang.org/x/arch v0.3.0
 ## explicit; go 1.17
 golang.org/x/arch/x86/x86asm
-# golang.org/x/crypto v0.21.0
-## explicit; go 1.18
+# golang.org/x/crypto v0.46.0
+## explicit; go 1.24.0
+golang.org/x/crypto/bcrypt
+golang.org/x/crypto/blowfish
 golang.org/x/crypto/sha3
-# golang.org/x/net v0.23.0
-## explicit; go 1.18
+# golang.org/x/net v0.47.0
+## explicit; go 1.24.0
 golang.org/x/net/html
 golang.org/x/net/html/atom
 golang.org/x/net/http/httpguts
@@ -149,12 +154,13 @@ golang.org/x/net/http2
 golang.org/x/net/http2/h2c
 golang.org/x/net/http2/hpack
 golang.org/x/net/idna
-# golang.org/x/sys v0.18.0
-## explicit; go 1.18
+golang.org/x/net/internal/httpcommon
+# golang.org/x/sys v0.39.0
+## explicit; go 1.24.0
 golang.org/x/sys/cpu
 golang.org/x/sys/unix
-# golang.org/x/text v0.14.0
-## explicit; go 1.18
+# golang.org/x/text v0.32.0
+## explicit; go 1.24.0
 golang.org/x/text/internal/language
 golang.org/x/text/internal/language/compact
 golang.org/x/text/internal/tag

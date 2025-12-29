@@ -14,10 +14,10 @@ import (
 )
 
 type Storage struct {
-	ctx   context.Context
-	redis *redis.Client
-
-	keys map[string]string
+	ctx    context.Context
+	redis  *redis.Client
+	userID string
+	keys   map[string]string
 }
 
 type DBBabyEvent struct {
@@ -35,7 +35,7 @@ func (e *DBBabyEvent) Json() (string, error) {
 	return string(marshalled), nil
 }
 
-func NewStorage() *Storage {
+func NewStorage(userID string) *Storage {
 	uri := os.Getenv("SCALINGO_REDIS_URL")
 	opts, err := redis.ParseURL(uri)
 	fmt.Println("uri: ", uri)
@@ -50,14 +50,15 @@ func NewStorage() *Storage {
 		}
 	}
 	rdb := redis.NewClient(opts)
-	fmt.Println("Redis connected")
+	fmt.Println("Redis connected for user:", userID)
 	st := &Storage{
-		ctx:   context.Background(),
-		redis: rdb,
+		ctx:    context.Background(),
+		redis:  rdb,
+		userID: userID,
 	}
 	st.keys = map[string]string{
-		"babyevents": "ts_events",
-		"debug":      "ts_debug",
+		"babyevents": fmt.Sprintf("user:%s:ts_events", userID),
+		"debug":      fmt.Sprintf("user:%s:ts_debug", userID),
 	}
 	return st
 }
@@ -223,4 +224,31 @@ func (s *Storage) Delete(event int64) bool {
 	res := s.redis.ZRemRangeByScore(s.ctx, bucket, fmt.Sprintf("%d", event-100), fmt.Sprintf("%d", event+100))
 	fmt.Println("Deleted: ", res.String())
 	return res.Val() == 0
+}
+
+func (s *Storage) GetAllData() []DBBabyEvent {
+	bucket := s.keys["babyevents"]
+	if os.Getenv("GIN_MODE") != "release" {
+		bucket = s.keys["debug"]
+	}
+	zs := s.redis.ZRangeByScore(s.ctx, bucket, &redis.ZRangeBy{
+		Min: "-inf",
+		Max: "+inf",
+	})
+	events := make([]DBBabyEvent, len(zs.Val()))
+	for i, z := range zs.Val() {
+		var e DBBabyEvent
+		json.Unmarshal([]byte(z), &e)
+		events[i] = e
+	}
+	return events
+}
+
+func (s *Storage) EraseAll() bool {
+	bucket := s.keys["babyevents"]
+	if os.Getenv("GIN_MODE") != "release" {
+		bucket = s.keys["debug"]
+	}
+	res := s.redis.Del(s.ctx, bucket)
+	return res.Err() == nil
 }
