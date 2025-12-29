@@ -1,0 +1,22 @@
+{
+  "name": "BabyCheck",
+  "description": "Baby tracking application for monitoring sleep, feeding, and diaper changes",
+  "repository": "https://github.com/your-username/BabyCheck",
+  "keywords": ["baby", "tracking", "parenting", "go", "react"],
+  "env": {
+    "GIN_MODE": {
+      "description": "Gin framework mode (release for production)",
+      "value": "release"
+    },
+    "REDIS_URL": {
+      "description": "Redis connection URL for data storage"
+    }
+  },
+  "addons": ["redis"],
+  "formation": {
+    "web": {
+      "amount": 1,
+      "size": "S"
+    }
+  }
+}
