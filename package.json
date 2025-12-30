@@ -1,0 +1,13 @@
+{
+  "name": "babycheck",
+  "version": "1.0.0",
+  "description": "Baby tracking application",
+  "scripts": {
+    "build": "cd frontend/babycheck-front && npm ci && npm run build && rm -rf ../../static/static/ && rm -f ../../static/asset-manifest.json && rm -f ../../static/index.html && cp -r build/* ../../static/",
+    "heroku-postbuild": "npm run build"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}
