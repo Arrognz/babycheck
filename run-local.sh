@@ -17,10 +17,11 @@ done
 
 echo "Redis is ready!"
 
-# Override Redis URL for local development
+# Override environment variables for local development
 export SCALINGO_REDIS_URL="redis://localhost:6379"
 export GIN_MODE="debug"
 export PORT="8080"
+export BASE_URL="http://localhost:8080"
 
 echo "Starting BabyCheck with local Redis on port $PORT..."
 echo "Passcode required: $PASSCODE"

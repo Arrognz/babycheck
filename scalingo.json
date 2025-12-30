@@ -10,6 +10,10 @@
     },
     "REDIS_URL": {
       "description": "Redis connection URL for data storage"
+    },
+    "BASE_URL": {
+      "description": "Base URL for the application (used in email links)",
+      "value": "https://your-app-name.osc-fr1.scalingo.io"
     }
   },
   "addons": ["redis"],
