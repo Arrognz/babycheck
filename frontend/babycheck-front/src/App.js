@@ -5,6 +5,7 @@ import Admin from "./Admin";
 import Profile from "./Profile";
 import DeleteAccount from "./DeleteAccount";
 import Stats from "./Stats";
+import CalendarView from "./CalendarView";
 import AuthForm from "./AuthForm";
 import ForgotPassword from "./ForgotPassword";
 import ResetPassword from "./ResetPassword";
@@ -63,6 +64,7 @@ function App() {
             <Route path="/admin" element={<Admin user={user} onLogout={handleLogout} />} />
             <Route path="/profile" element={<Profile user={user} onLogout={handleLogout} />} />
             <Route path="/stats" element={<Stats user={user} onLogout={handleLogout} />} />
+            <Route path="/calendar" element={<CalendarView user={user} onLogout={handleLogout} />} />
             <Route path="/delete-account" element={<DeleteAccount user={user} onLogout={handleLogout} />} />
           </>
         ) : (

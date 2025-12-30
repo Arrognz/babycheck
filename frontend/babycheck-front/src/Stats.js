@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowLeft } from "@fortawesome/free-solid-svg-icons";
+import { faArrowLeft, faCalendarDays } from "@fortawesome/free-solid-svg-icons";
 import Api from "./api/Api";
 import "./App.css";
 import { toHHMM } from "./Timer";
@@ -62,7 +62,20 @@ function Stats() {
             Retour
           </Link>
           <h2 style={{ margin: 0, fontSize: '24px' }}>Statistiques</h2>
-          <div style={{ width: '80px' }}></div>
+          <Link 
+            to="/calendar"
+            style={{ 
+              padding: '4px 8px',
+              backgroundColor: '#8b5a8c',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              fontSize: '12px',
+              textDecoration: 'none'
+            }}
+          >
+            <FontAwesomeIcon icon={faCalendarDays} />
+          </Link>
         </div>
 
         <div style={{ width: '100%', maxWidth: '400px', marginBottom: '30px' }}>

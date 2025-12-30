@@ -19,6 +19,7 @@ import {
   faUser,
   faChartBar,
   faSpinner,
+  faCalendarDays,
 } from "@fortawesome/free-solid-svg-icons";
 import Timer from "./Timer";
 import { formatDate } from "./Timeline";
@@ -238,6 +239,20 @@ function BabyTracker({ user, onLogout }) {
               }}
             >
               <FontAwesomeIcon icon={faChartBar} />
+            </Link>
+            <Link 
+              to="/calendar"
+              style={{ 
+                padding: '4px 8px',
+                backgroundColor: '#8b5a8c',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '12px',
+                textDecoration: 'none'
+              }}
+            >
+              <FontAwesomeIcon icon={faCalendarDays} />
             </Link>
             <Link 
               to="/profile"

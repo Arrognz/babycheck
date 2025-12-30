@@ -15,6 +15,7 @@ node_modules/
 static/asset-manifest.json
 static/index.html
 static/static/
+frontend/babycheck-front/static/static/
 
 # IDE
 .idea/
