@@ -1,0 +1,25 @@
+# Binaries
+babycheck
+.docker_build/
+
+# Go vendor
+vendor/
+
+# Environment files
+.env
+
+# Node modules
+node_modules/
+
+# Build artifacts (generated during deployment)
+static/asset-manifest.json
+static/index.html
+static/static/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
