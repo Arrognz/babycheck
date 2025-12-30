@@ -3,7 +3,11 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import BabyTracker from "./BabyTracker";
 import Admin from "./Admin";
 import Profile from "./Profile";
+import DeleteAccount from "./DeleteAccount";
+import Stats from "./Stats";
 import AuthForm from "./AuthForm";
+import ForgotPassword from "./ForgotPassword";
+import ResetPassword from "./ResetPassword";
 import "./App.css";
 
 function App() {
@@ -45,16 +49,25 @@ function App() {
     }}>Chargement...</div>;
   }
 
-  if (!isAuthenticated) {
-    return <AuthForm onAuthenticated={handleAuthenticated} />;
-  }
-
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<BabyTracker user={user} onLogout={handleLogout} />} />
-        <Route path="/admin" element={<Admin user={user} onLogout={handleLogout} />} />
-        <Route path="/profile" element={<Profile user={user} onLogout={handleLogout} />} />
+        {/* Public routes (no authentication required) */}
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        
+        {/* Protected routes */}
+        {isAuthenticated ? (
+          <>
+            <Route path="/" element={<BabyTracker user={user} onLogout={handleLogout} />} />
+            <Route path="/admin" element={<Admin user={user} onLogout={handleLogout} />} />
+            <Route path="/profile" element={<Profile user={user} onLogout={handleLogout} />} />
+            <Route path="/stats" element={<Stats user={user} onLogout={handleLogout} />} />
+            <Route path="/delete-account" element={<DeleteAccount user={user} onLogout={handleLogout} />} />
+          </>
+        ) : (
+          <Route path="/*" element={<AuthForm onAuthenticated={handleAuthenticated} />} />
+        )}
       </Routes>
     </Router>
   );

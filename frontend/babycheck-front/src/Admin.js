@@ -22,6 +22,9 @@ export default function Admin({ user, onLogout }) {
     const [allUsersData, setAllUsersData] = useState({});
     const [loading, setLoading] = useState(false);
     const [viewMode, setViewMode] = useState('my-data'); // 'my-data', 'all-users', 'all-data'
+    const [testEmail, setTestEmail] = useState('');
+    const [emailSending, setEmailSending] = useState(false);
+    const [emailMessage, setEmailMessage] = useState('');
 
     const isAdmin = user?.role === 'admin';
 
@@ -68,6 +71,28 @@ export default function Admin({ user, onLogout }) {
             await Api.eraseAllData();
             setData([]);
             setLoading(false);
+        }
+    };
+
+    const sendTestEmail = async () => {
+        if (!testEmail || !testEmail.includes('@')) {
+            setEmailMessage('Veuillez entrer une adresse email valide');
+            return;
+        }
+
+        setEmailSending(true);
+        setEmailMessage('');
+
+        try {
+            const response = await Api.sendTestEmail(testEmail);
+            setEmailMessage('Email de test envoyé avec succès ! 📧');
+            setTestEmail('');
+        } catch (error) {
+            console.error('Email send error:', error);
+            setEmailMessage('Erreur lors de l\'envoi de l\'email: ' + (error.message || 'Erreur inconnue'));
+        } finally {
+            setEmailSending(false);
+            setTimeout(() => setEmailMessage(''), 5000); // Clear message after 5 seconds
         }
     };
 
@@ -147,6 +172,62 @@ export default function Admin({ user, onLogout }) {
                             Toutes les Données
                         </button>
                     </div>
+                </div>
+            )}
+
+            {isAdmin && (
+                <div style={{ 
+                    marginBottom: '20px', 
+                    padding: '15px', 
+                    border: '1px solid #ddd', 
+                    borderRadius: '8px',
+                    backgroundColor: '#f9f9f9'
+                }}>
+                    <h3 style={{ margin: '0 0 10px 0' }}>Test Email</h3>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <input
+                            type="email"
+                            placeholder="votre-email@exemple.com"
+                            value={testEmail}
+                            onChange={(e) => setTestEmail(e.target.value)}
+                            disabled={emailSending}
+                            style={{
+                                padding: '8px 12px',
+                                border: '1px solid #ccc',
+                                borderRadius: '4px',
+                                minWidth: '250px',
+                                fontSize: '14px'
+                            }}
+                            onKeyPress={(e) => e.key === 'Enter' && sendTestEmail()}
+                        />
+                        <button 
+                            onClick={sendTestEmail}
+                            disabled={emailSending || !testEmail}
+                            style={{ 
+                                padding: '8px 16px',
+                                backgroundColor: emailSending ? '#ccc' : '#28a745',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: emailSending ? 'not-allowed' : 'pointer',
+                                fontSize: '14px'
+                            }}
+                        >
+                            {emailSending ? 'Envoi...' : '📧 Envoyer Test Email'}
+                        </button>
+                    </div>
+                    {emailMessage && (
+                        <div style={{
+                            marginTop: '10px',
+                            padding: '8px 12px',
+                            borderRadius: '4px',
+                            backgroundColor: emailMessage.includes('succès') ? '#d4edda' : '#f8d7da',
+                            color: emailMessage.includes('succès') ? '#155724' : '#721c24',
+                            fontSize: '14px'
+                        }}>
+                            {emailMessage}
+                        </div>
+                    )}
                 </div>
             )}
             
@@ -243,6 +324,7 @@ export default function Admin({ user, onLogout }) {
                     <tr style={{ borderBottom: '2px solid #ccc' }}>
                         <th style={{ padding: '8px', textAlign: 'left' }}>Nom du Bébé</th>
                         <th style={{ padding: '8px', textAlign: 'left' }}>Rôle</th>
+                        <th style={{ padding: '8px', textAlign: 'left' }}>Email</th>
                         <th style={{ padding: '8px', textAlign: 'left' }}>Date de Création</th>
                         <th style={{ padding: '8px', textAlign: 'left' }}>ID</th>
                     </tr>
@@ -255,6 +337,20 @@ export default function Admin({ user, onLogout }) {
                             </td>
                             <td style={{ padding: '8px' }}>
                                 {user.role === 'admin' ? 'Administrateur' : 'Utilisateur'}
+                            </td>
+                            <td style={{ padding: '8px' }}>
+                                {user.email ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        <span>{user.email}</span>
+                                        {user.email_verified ? (
+                                            <span style={{ color: '#28a745', fontSize: '14px' }}>✅</span>
+                                        ) : (
+                                            <span style={{ color: '#ffc107', fontSize: '14px' }}>⚠️</span>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <span style={{ color: '#6c757d', fontStyle: 'italic' }}>Aucun email</span>
+                                )}
                             </td>
                             <td style={{ padding: '8px' }}>
                                 {new Date(user.created * 1000).toLocaleString()}
@@ -287,7 +383,24 @@ export default function Admin({ user, onLogout }) {
                                 {userName} ({events.length} événements)
                             </h3>
                             <div style={{ marginBottom: '15px', fontSize: '14px', color: '#666' }}>
-                                Créé le: {new Date(userInfo.created * 1000).toLocaleDateString()} | ID: {userInfo.id}
+                                <div style={{ marginBottom: '8px' }}>
+                                    Créé le: {new Date(userInfo.created * 1000).toLocaleDateString()} | ID: {userInfo.id}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    <strong>Email:</strong>
+                                    {userInfo.email ? (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                            <span>{userInfo.email}</span>
+                                            {userInfo.email_verified ? (
+                                                <span style={{ color: '#28a745' }}>✅ Vérifié</span>
+                                            ) : (
+                                                <span style={{ color: '#ffc107' }}>⚠️ Non vérifié</span>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <span style={{ color: '#6c757d', fontStyle: 'italic' }}>Aucun email configuré</span>
+                                    )}
+                                </div>
                             </div>
                             
                             {events.length === 0 ? (

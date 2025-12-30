@@ -12,25 +12,25 @@ import {
   faPersonBreastfeeding,
   faPoo,
   faSun,
-  faTimes,
   faTimesCircle,
   faCircleNotch,
   faCheckCircle,
-  faCircle,
   faCog,
   faUser,
+  faChartBar,
+  faSpinner,
 } from "@fortawesome/free-solid-svg-icons";
-import Timer, { toHHMM } from "./Timer";
+import Timer from "./Timer";
 import { formatDate } from "./Timeline";
 import DelaySelector from "./DelaySelector";
 
 const map = {
-  undefined: "Ne fait rien",
-  sleep: "Dort",
+  undefined: "État inconnu",
+  sleep: "dort",
   nap: "Sieste",
-  leftBoob: "Mange",
-  rightBoob: "Mange",
-  wake: "Est éveillé",
+  leftBoob: "tète",
+  rightBoob: "tète",
+  wake: "est éveillé",
   crying: "Pleure",
   pee: "Pipi",
   poop: "Caca",
@@ -44,11 +44,10 @@ const mapDetails = {
 function BabyTracker({ user, onLogout }) {
   const [babystate, setBabystate] = useState(undefined);
   const [lastChange, setLastChange] = useState(undefined);
+  const [isUpdatingState, setIsUpdatingState] = useState(false);
   const [events, setEvents] = useState([]);
-  const [mode, setMode] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [modalClosing, setModalClosing] = useState(false);
-  const [buttonStyle, setButtonStyle] = useState("normal");
 
   // action form
   const [addAction, setAddAction] = useState("sleep");
@@ -74,11 +73,6 @@ function BabyTracker({ user, onLogout }) {
     }
   }, [showAddModal])
 
-  useEffect(() => {
-    Api.getMode().then((response) => {
-      setMode(response.mode);
-    });
-  }, []);
 
   const save = async (action, timestamp) => {
     const response = await Api.add(action, timestamp);
@@ -88,31 +82,89 @@ function BabyTracker({ user, onLogout }) {
   };
 
   const remote = async (action) => {
+    setIsUpdatingState(true);
     const response = await Api.remote(action);
     if (response.ok) {
-      setBabystate(action);
-      setLastChange(Date.now());
-      fetchData();
+      // Don't set state here - let refreshTimelineAndState handle it properly
+      // This prevents timing conflicts and ensures immediate refresh
+      await refreshTimelineAndState();
     }
+    setIsUpdatingState(false);
   };
 
+  // Function to refresh only the timeline events (fast, no delay)
+  const refreshTimeline = React.useCallback(async () => {
+    const response = await Api.search(
+      new Date().getTime() - 24 * 60 * 60 * 1000,
+      new Date().getTime()
+    );
+    const events = response.events || [];
+    setEvents(events);
+  }, []);
+
+  // Function to update baby state based on events
+  const updateBabyState = React.useCallback((events) => {
+    // Find the most recent sleep-related event to determine current state
+    const sleepRelatedEvents = events
+      .filter(event => event.name === 'sleep' || event.name === 'wake')
+      .sort((a, b) => b.timestamp - a.timestamp); // Sort by timestamp descending
+    
+    // Find the most recent feeding-related events
+    const feedingEvents = events
+      .filter(event => event.name === 'leftBoob' || event.name === 'rightBoob' || 
+                       event.name === 'leftBoobStop' || event.name === 'rightBoobStop')
+      .sort((a, b) => b.timestamp - a.timestamp); // Sort by timestamp descending
+    
+    const mostRecentSleepEvent = sleepRelatedEvents[0];
+    const mostRecentFeedingEvent = feedingEvents[0];
+    
+    // Determine current state priority: feeding > sleeping/awake > undefined
+    let newState = undefined;
+    let newStateTimestamp = undefined;
+    
+    // Check if currently feeding (last feeding event was start, not stop)
+    if (mostRecentFeedingEvent && 
+        (mostRecentFeedingEvent.name === 'leftBoob' || mostRecentFeedingEvent.name === 'rightBoob')) {
+      newState = mostRecentFeedingEvent.name;
+      newStateTimestamp = mostRecentFeedingEvent.timestamp;
+    } else if (mostRecentSleepEvent) {
+      // Not feeding, check sleep state
+      newState = mostRecentSleepEvent.name === 'sleep' ? 'sleep' : 'wake';
+      newStateTimestamp = mostRecentSleepEvent.timestamp;
+    }
+    
+    if (newState !== babystate || newStateTimestamp !== lastChange) {
+      setBabystate(newState);
+      setLastChange(newStateTimestamp);
+    }
+  }, [babystate, lastChange]);
+
+  // Full refresh function (timeline + state, with delay for remote actions)
   const fetchData = React.useCallback(async () => {
     await new Promise((resolve) => setTimeout(resolve, 500));
     const response = await Api.search(
       new Date().getTime() - 24 * 60 * 60 * 1000,
       new Date().getTime()
     );
-    setEvents(response.events || []);
-    const last = response.events[response.events.length - 1];
-    if (last && last.name !== babystate) {
-      setBabystate(last.name);
-      setLastChange(last.timestamp);
-    }
-  }, [babystate]);
+    const events = response.events || [];
+    setEvents(events);
+    updateBabyState(events);
+  }, [updateBabyState]);
+
+  // Fast refresh function for adding/editing events (timeline + state, no delay)
+  const refreshTimelineAndState = React.useCallback(async () => {
+    const response = await Api.search(
+      new Date().getTime() - 24 * 60 * 60 * 1000,
+      new Date().getTime()
+    );
+    const events = response.events || [];
+    setEvents(events);
+    updateBabyState(events);
+  }, [updateBabyState]);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   let gridClass = "actions-container";
   let sleepClass = "sleep-button";
@@ -134,12 +186,6 @@ function BabyTracker({ user, onLogout }) {
   let peeClass = "pee-button";
   let pooClass = "poo-button";
 
-  const lastSleep = events.filter((e) => e.name === "sleep").pop();
-  const lastWake = events.filter((e) => e.name === "wake").pop();
-  const last =
-    lastSleep && lastWake && lastSleep.timestamp > lastWake.timestamp
-      ? lastSleep
-      : lastWake;
   let modalClass = "modal";
   if (modalClosing) {
     modalClass = "modal closed";
@@ -160,86 +206,44 @@ function BabyTracker({ user, onLogout }) {
     )}`;
   }
 
-  // sum sleep events
-  let _isSleeping = false;
-  let _sleepTime = 0;
-  let _lastSleepStart = 0;
-  let _leftBoobCount = 0;
-  let _rightBoobCount = 0;
-  let _lastLeftBoob = 0;
-  let _lastRightBoob = 0;
-  let _isEating = false;
-  let _leftBoobDuration = 0;
-  let _rightBoobDuration = 0;
-  let peeCount = 0;
-  let poopCount = 0;
-  for (let i = 0; i < events.length; i++) {
-    if (events[i].name === "sleep") {
-      _isSleeping = true;
-      _lastSleepStart = events[i].timestamp;
-    }
-    if (
-      [
-        "wake",
-        "pee",
-        "poop",
-        "leftBoob",
-        "rightBoob",
-        "leftBoobStop",
-        "rightBoobStop",
-      ].includes(events[i].name) &&
-      _isSleeping
-    ) {
-      _isSleeping = false;
-      _sleepTime += events[i].timestamp - _lastSleepStart;
-    }
-    if (events[i].name === "leftBoob") {
-      _leftBoobCount++;
-      _lastLeftBoob = events[i].timestamp;
-      _isEating = true;
-    }
-    if (events[i].name === "rightBoob") {
-      _rightBoobCount++;
-      _lastRightBoob = events[i].timestamp;
-      _isEating = true;
-    }
-    if (events[i].name === "leftBoobStop") {
-      _leftBoobDuration += events[i].timestamp - _lastLeftBoob;
-      _isEating = false;
-    }
-    if (events[i].name === "rightBoobStop") {
-      _rightBoobDuration += events[i].timestamp - _lastRightBoob;
-      _isEating = false;
-    }
-    if (events[i].name === "pee") {
-      peeCount++;
-    }
-    if (events[i].name === "poop") {
-      poopCount++;
-    }
-  }
-  if (_isSleeping) {
-    _sleepTime += Date.now() - _lastSleepStart;
-  }
-  if (_isEating) {
-    if (_lastLeftBoob > _lastRightBoob) {
-      _leftBoobDuration += Date.now() - _lastLeftBoob;
-    } else {
-      _rightBoobDuration += Date.now() - _lastRightBoob;
-    }
-  }
 
   return (
     <div className="App">
       <header className="App-header">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: '400px' }}>
-          <h1>{user?.username} {map[babystate]}</h1>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+            <h1 style={{ margin: '0', fontSize: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {user?.username} {map[babystate]}
+              {(babystate === 'leftBoob' || babystate === 'rightBoob') && (
+                <FontAwesomeIcon icon={faSpinner} spin style={{ fontSize: '16px', color: '#e879f9' }} />
+              )}
+            </h1>
+            {lastChange && !isUpdatingState && (
+              <div style={{ fontSize: '14px', color: '#a0a0a0', marginTop: '2px' }}>
+                <Timer from={lastChange} interval={5000} label="Depuis " />
+              </div>
+            )}
+          </div>
           <div style={{ display: 'flex', gap: '8px' }}>
+            <Link 
+              to="/stats"
+              style={{ 
+                padding: '4px 8px',
+                backgroundColor: '#4a90e2',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '12px',
+                textDecoration: 'none'
+              }}
+            >
+              <FontAwesomeIcon icon={faChartBar} />
+            </Link>
             <Link 
               to="/profile"
               style={{ 
                 padding: '4px 8px',
-                backgroundColor: '#555',
+                backgroundColor: '#4a5568',
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',
@@ -254,7 +258,7 @@ function BabyTracker({ user, onLogout }) {
                 to="/admin"
                 style={{ 
                   padding: '4px 8px',
-                  backgroundColor: '#666',
+                  backgroundColor: '#2d3748',
                   color: 'white',
                   border: 'none',
                   borderRadius: '4px',
@@ -265,20 +269,6 @@ function BabyTracker({ user, onLogout }) {
                 <FontAwesomeIcon icon={faCog} />
               </Link>
             )}
-          </div>
-        </div>
-        <div style={{ fontSize: "12px", padding: '2px', margin: "2px" }}>
-          <div>{toHHMM(_sleepTime / 1000)} de sommeil depuis 24h</div>
-          <div>
-            {_leftBoobCount} fois au sein gauche (
-            {toHHMM(_leftBoobDuration / 1000)} au total)
-          </div>
-          <div>
-            {_rightBoobCount} fois au sein droit (
-            {toHHMM(_rightBoobDuration / 1000)} au total)
-          </div>
-          <div>
-            {peeCount} pipis et {poopCount} cacas
           </div>
         </div>
         {showAddModal && (
@@ -318,7 +308,7 @@ function BabyTracker({ user, onLogout }) {
                   className={"nap-button"}
                   style={
                     addAction === "nap"
-                      ? { border: "3px solid dodgerblue" }
+                      ? { border: "3px solid #7dd3fc" }
                       : {}
                   }
                   onClick={() => {
@@ -333,7 +323,7 @@ function BabyTracker({ user, onLogout }) {
                   className={"sleep-button sleeping"}
                   style={
                     addAction === "sleep"
-                      ? { border: "3px solid dodgerblue" }
+                      ? { border: "3px solid #7dd3fc" }
                       : {}
                   }
                   onClick={() => {
@@ -347,7 +337,7 @@ function BabyTracker({ user, onLogout }) {
                   className={"sleep-button"}
                   style={
                     addAction === "wake"
-                      ? { border: "3px solid dodgerblue" }
+                      ? { border: "3px solid #7dd3fc" }
                       : {}
                   }
                   onClick={() => {
@@ -362,7 +352,7 @@ function BabyTracker({ user, onLogout }) {
                   className={"left-button"}
                   style={
                     addAction === "leftBoob"
-                      ? { border: "3px solid dodgerblue" }
+                      ? { border: "3px solid #7dd3fc" }
                       : {}
                   }
                   onClick={() => {
@@ -379,7 +369,7 @@ function BabyTracker({ user, onLogout }) {
                   className={"right-button"}
                   style={
                     addAction === "rightBoob"
-                      ? { border: "3px solid dodgerblue" }
+                      ? { border: "3px solid #7dd3fc" }
                       : {}
                   }
                   onClick={() => {
@@ -396,7 +386,7 @@ function BabyTracker({ user, onLogout }) {
                   className={"pee-button"}
                   style={
                     addAction === "pee"
-                      ? { border: "3px solid dodgerblue" }
+                      ? { border: "3px solid #7dd3fc" }
                       : {}
                   }
                   onClick={() => {
@@ -411,7 +401,7 @@ function BabyTracker({ user, onLogout }) {
                   className={"poo-button"}
                   style={
                     addAction === "poop"
-                      ? { border: "3px solid dodgerblue" }
+                      ? { border: "3px solid #7dd3fc" }
                       : {}
                   }
                   onClick={() => {
@@ -473,7 +463,7 @@ function BabyTracker({ user, onLogout }) {
                       addActionTime.getTime() + addActionDuration * 60 * 1000
                     );
                   }
-                  await fetchData();
+                  await refreshTimelineAndState();
                   setShowAddIcon('check');
                   setShowAddIconSpin(false);
                   setTimeout(() => {
@@ -491,81 +481,59 @@ function BabyTracker({ user, onLogout }) {
           start={new Date().getTime() - 24 * 60 * 60 * 1000}
           stop={new Date().getTime()}
         />
-        <div className={gridClass}>
+        {/* Responsive toolbar container */}
+        <div className="toolbar-container">
+          {/* Top row - Add button only */}
+          <div className="top-toolbar">
+            <div className={"add-button"} onClick={() => setShowAddModal(true)}>
+              <FontAwesomeIcon icon={faAdd} fontSize={18} />
+            </div>
+          </div>
+          
+          {/* Bottom row - All other buttons */}
+          <div className={gridClass}>
           <div
             className={sleepClass}
             onClick={() => {
               remote("sleep");
             }}
           >
-            <span>{isSleeping ? "Reveil" : "Dodo"}</span>
-            <br />
+            <span style={{ fontSize: '10px', fontWeight: 'bold' }}>
+              {isSleeping ? "Reveil" : "Dodo"}
+            </span>
             {isSleeping && (
-              <>
-                <FontAwesomeIcon
-                  icon={faMoon}
-                  fontSize={20}
-                  label={"dort depuis"}
-                />
-              </>
+              <FontAwesomeIcon
+                icon={faMoon}
+                fontSize={16}
+                label={"dort depuis"}
+              />
             )}
             {!isSleeping && (
-              <>
-                <FontAwesomeIcon
-                  icon={faSun}
-                  fontSize={20}
-                  label={"éveil depuis"}
-                />
-              </>
+              <FontAwesomeIcon
+                icon={faSun}
+                fontSize={16}
+                label={"éveil depuis"}
+              />
             )}
-            {last && <Timer from={last.timestamp} interval={5000} />}
           </div>
           <div className="spacer" />
           <div
             className={leftClass}
-            style={_lastLeftBoob < _lastRightBoob ? { border: "2px dashed crimson" } : {}}
             onClick={() => {
               remote("leftBoob");
             }}
           >
-            <span>G</span>
-            <br />
-            {isLeftBoob && (
-              <>
-                <FontAwesomeIcon icon={faPersonBreastfeeding} fontSize={20} />
-              </>
-            )}
-            {!isLeftBoob && (
-              <>
-                <FontAwesomeIcon icon={faPersonBreastfeeding} fontSize={20} />
-              </>
-            )}
-            {isLeftBoob && (
-              <Timer from={lastChange} interval={5000} label={""} />
-            )}
+            <span style={{ fontSize: '10px', fontWeight: 'bold' }}>G</span>
+            <FontAwesomeIcon icon={faPersonBreastfeeding} fontSize={16} />
           </div>
           <div
             className={rightClass}
-            style={_lastLeftBoob >= _lastRightBoob ? { border: "2px dashed crimson" } : {}}
             onClick={() => {
               remote("rightBoob");
             }}
           >
-            <span>D</span>
-            <br />
-            {isRightBoob && (
-              <>
-                <FontAwesomeIcon icon={faPersonBreastfeeding} fontSize={20} />
-              </>
-            )}
-            {!isRightBoob && (
-              <>
-                <FontAwesomeIcon icon={faPersonBreastfeeding} fontSize={20} />
-              </>
-            )}
-            {isRightBoob && (
-              <Timer from={lastChange} interval={5000} label={""} />
-            )}
+            <span style={{ fontSize: '10px', fontWeight: 'bold' }}>D</span>
+            <FontAwesomeIcon icon={faPersonBreastfeeding} fontSize={16} />
           </div>
           <div className="spacer" />
           <div
@@ -584,10 +552,7 @@ function BabyTracker({ user, onLogout }) {
           >
             <FontAwesomeIcon icon={faPoo} fontSize={20} />
           </div>
-          <div className="spacer" />
-          <div className={"add-button"} onClick={() => setShowAddModal(true)}>
-            <FontAwesomeIcon icon={faAdd} fontSize={12} />
-          </div>
+        </div>
         </div>
       </header>
     </div>

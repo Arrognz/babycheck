@@ -72,6 +72,24 @@ class Api {
         }
     }
 
+    async updateEvent(timestamp, newAction) {
+        try {
+            const response = await fetch(`${this.baseUrl}/event/update`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...this.getAuthHeaders()
+                },
+                body: JSON.stringify({ timestamp, new_action: newAction })
+            });
+            const body = await response.json();
+            return body;
+        } catch (e) {
+            console.error(e);
+            return {};
+        }
+    }
+
     async getMode() {
         try {
             const response = await fetch(`${this.baseUrl}/mode`, {
@@ -85,14 +103,19 @@ class Api {
         }
     }
 
-    async register(username, password) {
+    async register(username, password, email = '') {
         try {
+            const body = { username, password };
+            if (email) {
+                body.email = email;
+            }
+            
             const response = await fetch(`${this.baseUrl}/register`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify(body)
             });
             return {
                 ok: response.ok,
@@ -193,6 +216,186 @@ class Api {
         } catch (e) {
             console.error(e);
             return {};
+        }
+    }
+
+    async sendTestEmail(email) {
+        try {
+            const response = await fetch(`${this.baseUrl}/admin/test-email`, {
+                method: 'POST',
+                headers: {
+                    ...this.getAuthHeaders(),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ email })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Email send failed');
+            }
+
+            const body = await response.json();
+            return body;
+        } catch (e) {
+            console.error('Email send error:', e);
+            throw e;
+        }
+    }
+
+    async getCurrentUser() {
+        try {
+            const response = await fetch(`${this.baseUrl}/me`, {
+                headers: this.getAuthHeaders()
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to get current user');
+            }
+
+            const body = await response.json();
+            return body.user;
+        } catch (e) {
+            console.error('Get current user error:', e);
+            throw e;
+        }
+    }
+
+    async sendVerificationEmail(email) {
+        try {
+            const response = await fetch(`${this.baseUrl}/send-verification-email`, {
+                method: 'POST',
+                headers: {
+                    ...this.getAuthHeaders(),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ email })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Verification email send failed');
+            }
+
+            const body = await response.json();
+            return body;
+        } catch (e) {
+            console.error('Verification email error:', e);
+            throw e;
+        }
+    }
+
+    async verifyEmailCode(email, code) {
+        try {
+            const response = await fetch(`${this.baseUrl}/verify-email`, {
+                method: 'POST',
+                headers: {
+                    ...this.getAuthHeaders(),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ email, code })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Email verification failed');
+            }
+
+            const body = await response.json();
+            return body;
+        } catch (e) {
+            console.error('Email verification error:', e);
+            throw e;
+        }
+    }
+
+    async deleteAccount(babyName) {
+        try {
+            const response = await fetch(`${this.baseUrl}/delete-account`, {
+                method: 'DELETE',
+                headers: {
+                    ...this.getAuthHeaders(),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ baby_name: babyName })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Account deletion failed');
+            }
+
+            const body = await response.json();
+            return body;
+        } catch (e) {
+            console.error('Account deletion error:', e);
+            throw e;
+        }
+    }
+
+    async requestPasswordReset(email) {
+        try {
+            const response = await fetch(`${this.baseUrl}/request-password-reset`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ email })
+            });
+
+            return {
+                ok: response.ok,
+                status: response.status,
+                data: await response.json()
+            };
+        } catch (e) {
+            console.error('Password reset request error:', e);
+            return { ok: false, error: e.message };
+        }
+    }
+
+    async resetPassword(token, password) {
+        try {
+            const response = await fetch(`${this.baseUrl}/reset-password`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ token, password })
+            });
+
+            return {
+                ok: response.ok,
+                status: response.status,
+                data: await response.json()
+            };
+        } catch (e) {
+            console.error('Password reset error:', e);
+            return { ok: false, error: e.message };
+        }
+    }
+
+    async getStats(period) {
+        try {
+            const response = await fetch(`${this.baseUrl}/stats`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...this.getAuthHeaders()
+                },
+                body: JSON.stringify({ period })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Stats fetch failed');
+            }
+
+            return await response.json();
+        } catch (e) {
+            console.error('Stats fetch error:', e);
+            throw e;
         }
     }
 }

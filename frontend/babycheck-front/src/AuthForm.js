@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUser, faLock, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
+import { faUser, faLock, faEye, faEyeSlash, faEnvelope } from "@fortawesome/free-solid-svg-icons";
 import Api from './api/Api';
 
 export default function AuthForm({ onAuthenticated }) {
     const [isLogin, setIsLogin] = useState(true);
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [email, setEmail] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
@@ -21,7 +23,7 @@ export default function AuthForm({ onAuthenticated }) {
             if (isLogin) {
                 response = await Api.login(username, password);
             } else {
-                response = await Api.register(username, password);
+                response = await Api.register(username, password, email);
                 if (response.ok) {
                     // After successful registration, automatically login
                     response = await Api.login(username, password);
@@ -71,7 +73,7 @@ export default function AuthForm({ onAuthenticated }) {
                 <div style={{ marginBottom: '20px' }}>
                     <button
                         type="button"
-                        onClick={() => {setIsLogin(true); setError('');}}
+                        onClick={() => {setIsLogin(true); setError(''); setEmail('');}}
                         style={{
                             padding: '10px 20px',
                             marginRight: '10px',
@@ -86,7 +88,7 @@ export default function AuthForm({ onAuthenticated }) {
                     </button>
                     <button
                         type="button"
-                        onClick={() => {setIsLogin(false); setError('');}}
+                        onClick={() => {setIsLogin(false); setError(''); setEmail('');}}
                         style={{
                             padding: '10px 20px',
                             backgroundColor: !isLogin ? '#61dafb' : 'transparent',
@@ -106,7 +108,7 @@ export default function AuthForm({ onAuthenticated }) {
                             type="text"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
-                            placeholder="Nom du bébé"
+                            placeholder={isLogin ? "Nom du bébé ou email" : "Nom du bébé"}
                             style={{
                                 width: '100%',
                                 padding: '15px 15px 15px 50px',
@@ -133,6 +135,41 @@ export default function AuthForm({ onAuthenticated }) {
                             }}
                         />
                     </div>
+
+                    {!isLogin && (
+                        <div style={{ position: 'relative', marginBottom: '20px' }}>
+                            <input
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder="Adresse email"
+                                style={{
+                                    width: '100%',
+                                    padding: '15px 15px 15px 50px',
+                                    fontSize: '18px',
+                                    border: '1px solid #555',
+                                    borderRadius: '8px',
+                                    backgroundColor: '#2a2e37',
+                                    color: 'white',
+                                    outline: 'none',
+                                    boxSizing: 'border-box'
+                                }}
+                                disabled={loading}
+                                required
+                            />
+                            <FontAwesomeIcon 
+                                icon={faEnvelope} 
+                                style={{
+                                    position: 'absolute',
+                                    left: '15px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    color: '#ccc',
+                                    fontSize: '18px'
+                                }}
+                            />
+                        </div>
+                    )}
 
                     <div style={{ position: 'relative', marginBottom: '20px' }}>
                         <input
@@ -187,16 +224,16 @@ export default function AuthForm({ onAuthenticated }) {
                     
                     <button
                         type="submit"
-                        disabled={loading || !username || !password}
+                        disabled={loading || !username || !password || (!isLogin && password.length < 6)}
                         style={{
                             width: '100%',
                             padding: '15px',
                             fontSize: '18px',
-                            backgroundColor: loading || !username || !password ? '#555' : '#61dafb',
-                            color: loading || !username || !password ? '#ccc' : '#282c34',
+                            backgroundColor: loading || !username || !password || (!isLogin && password.length < 6) ? '#555' : '#61dafb',
+                            color: loading || !username || !password || (!isLogin && password.length < 6) ? '#ccc' : '#282c34',
                             border: 'none',
                             borderRadius: '8px',
-                            cursor: loading || !username || !password ? 'not-allowed' : 'pointer',
+                            cursor: loading || !username || !password || (!isLogin && password.length < 6) ? 'not-allowed' : 'pointer',
                             fontWeight: 'bold',
                             boxSizing: 'border-box'
                         }}
@@ -206,6 +243,23 @@ export default function AuthForm({ onAuthenticated }) {
                             (isLogin ? 'Se connecter' : 'S\'inscrire')
                         }
                     </button>
+
+                    {isLogin && (
+                        <div style={{ textAlign: 'center', marginTop: '15px' }}>
+                            <a
+                                href="/forgot-password"
+                                style={{
+                                    color: '#61dafb',
+                                    textDecoration: 'none',
+                                    fontSize: '14px'
+                                }}
+                                onMouseOver={(e) => e.target.style.textDecoration = 'underline'}
+                                onMouseOut={(e) => e.target.style.textDecoration = 'none'}
+                            >
+                                Mot de passe oublié ?
+                            </a>
+                        </div>
+                    )}
                 </form>
                 
                 {error && (

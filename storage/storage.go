@@ -2,11 +2,9 @@ package storage
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -36,21 +34,13 @@ func (e *DBBabyEvent) Json() (string, error) {
 }
 
 func NewStorage(userID string) *Storage {
-	uri := os.Getenv("SCALINGO_REDIS_URL")
-	opts, err := redis.ParseURL(uri)
-	fmt.Println("uri: ", uri)
-	if err != nil {
-		// Handle error
-		fmt.Println("error: ", err)
+	rdb := GetRedisClient()
+	if rdb == nil {
+		fmt.Printf("Erreur: impossible d'obtenir une connexion Redis pour l'utilisateur %s\n", userID)
 		return nil
 	}
-	if strings.HasPrefix(uri, "rediss") {
-		opts.TLSConfig = &tls.Config{
-			InsecureSkipVerify: true,
-		}
-	}
-	rdb := redis.NewClient(opts)
-	fmt.Println("Redis connected for user:", userID)
+
+	fmt.Printf("Storage créé pour l'utilisateur: %s\n", userID)
 	st := &Storage{
 		ctx:    context.Background(),
 		redis:  rdb,
@@ -226,6 +216,59 @@ func (s *Storage) Delete(event int64) bool {
 	return res.Val() == 0
 }
 
+func (s *Storage) UpdateEvent(timestamp int64, newAction string) bool {
+	// if GIN_MODE is not release, use debug bucket
+	bucket := s.keys["babyevents"]
+	if os.Getenv("GIN_MODE") != "release" {
+		bucket = s.keys["debug"]
+	}
+	
+	// Get the existing event
+	events := s.redis.ZRangeByScore(s.ctx, bucket, &redis.ZRangeBy{
+		Min: fmt.Sprintf("%d", timestamp-100),
+		Max: fmt.Sprintf("%d", timestamp+100),
+	})
+	
+	if events.Err() != nil || len(events.Val()) == 0 {
+		fmt.Printf("No event found at timestamp %d\n", timestamp)
+		return false
+	}
+	
+	// Parse the existing event
+	var existingEvent DBBabyEvent
+	err := json.Unmarshal([]byte(events.Val()[0]), &existingEvent)
+	if err != nil {
+		fmt.Printf("Error unmarshaling event: %v\n", err)
+		return false
+	}
+	
+	// Create updated event
+	updatedEvent := DBBabyEvent{
+		ID:        existingEvent.ID,
+		Timestamp: existingEvent.Timestamp,
+		Name:      newAction,
+		Author:    existingEvent.Author,
+	}
+	
+	// Remove old event
+	s.redis.ZRemRangeByScore(s.ctx, bucket, fmt.Sprintf("%d", timestamp-100), fmt.Sprintf("%d", timestamp+100))
+	
+	// Add updated event
+	updatedJSON, err := updatedEvent.Json()
+	if err != nil {
+		fmt.Printf("Error marshaling updated event: %v\n", err)
+		return false
+	}
+	
+	res := s.redis.ZAdd(s.ctx, bucket, redis.Z{
+		Score:  float64(updatedEvent.Timestamp),
+		Member: updatedJSON,
+	})
+	
+	fmt.Printf("Updated event at timestamp %d from %s to %s\n", timestamp, existingEvent.Name, newAction)
+	return res.Err() == nil
+}
+
 func (s *Storage) GetAllData() []DBBabyEvent {
 	bucket := s.keys["babyevents"]
 	if os.Getenv("GIN_MODE") != "release" {
@@ -251,4 +294,171 @@ func (s *Storage) EraseAll() bool {
 	}
 	res := s.redis.Del(s.ctx, bucket)
 	return res.Err() == nil
+}
+
+// BabyStats represents computed statistics for baby events
+type BabyStats struct {
+	SleepTime           int64   `json:"sleep_time"`           // Total sleep time in milliseconds
+	SleepCount          int     `json:"sleep_count"`          // Number of sleep sessions (naps)
+	AverageSleepTime    int64   `json:"average_sleep_time"`   // Average sleep session duration in milliseconds
+	LeftBoobCount       int     `json:"left_boob_count"`      // Number of left breast feeds
+	RightBoobCount      int     `json:"right_boob_count"`     // Number of right breast feeds
+	LeftBoobDuration    int64   `json:"left_boob_duration"`   // Total left breast feed duration in milliseconds
+	RightBoobDuration   int64   `json:"right_boob_duration"`  // Total right breast feed duration in milliseconds
+	PeeCount           int     `json:"pee_count"`            // Number of pee events
+	PoopCount          int     `json:"poop_count"`           // Number of poop events
+	PeriodStart        int64   `json:"period_start"`         // Start timestamp of period
+	PeriodEnd          int64   `json:"period_end"`           // End timestamp of period
+}
+
+// CalculateStats computes statistics for baby events within a time range
+func (s *Storage) CalculateStats(start, end int64) *BabyStats {
+	events := s.Search(start, end)
+	
+	// Check if we need to look back for incomplete sleep periods
+	// If the first sleep-related event is "wake", baby was sleeping before the period
+	var sleepStartBeforePeriod int64
+	sleepRelatedEvents := make([]DBBabyEvent, 0)
+	
+	for _, event := range events {
+		if event.Name == "sleep" || event.Name == "wake" {
+			sleepRelatedEvents = append(sleepRelatedEvents, event)
+		}
+	}
+	
+	// If first sleep event is "wake", look for the corresponding "sleep" before the period
+	if len(sleepRelatedEvents) > 0 && sleepRelatedEvents[0].Name == "wake" {
+		// Search for events before the period start to find the sleep event
+		olderEvents := s.Search(start-7*24*60*60*1000, start) // Look back up to 7 days
+		
+		// Find the most recent sleep event before the period
+		for i := len(olderEvents) - 1; i >= 0; i-- {
+			if olderEvents[i].Name == "sleep" {
+				sleepStartBeforePeriod = olderEvents[i].Timestamp
+				break
+			}
+		}
+	}
+	
+	stats := &BabyStats{
+		PeriodStart: start,
+		PeriodEnd:   end,
+	}
+	
+	var isSleeping bool
+	var lastSleepStart int64
+	var leftBoobStart, rightBoobStart int64
+	var isEatingLeft, isEatingRight bool
+	var sleepSessions []int64 // Track individual sleep session durations
+	
+	// If baby was sleeping before the period, initialize accordingly
+	if sleepStartBeforePeriod > 0 {
+		isSleeping = true
+		lastSleepStart = sleepStartBeforePeriod
+	}
+	
+	// Helper function to handle sleep interruption
+	handleSleepInterruption := func(eventTimestamp int64) {
+		if isSleeping {
+			sleepDuration := eventTimestamp - lastSleepStart
+			
+			// If sleep started before period, only count time within the period
+			if lastSleepStart < start {
+				sleepDuration = eventTimestamp - start
+				// Don't count as a completed session if it started before period
+			} else {
+				// Complete session within period
+				stats.SleepCount++
+				sleepSessions = append(sleepSessions, sleepDuration)
+			}
+			
+			stats.SleepTime += sleepDuration
+			isSleeping = false
+		}
+	}
+	
+	// Process events chronologically
+	for _, event := range events {
+		switch event.Name {
+		case "sleep":
+			if !isSleeping {
+				isSleeping = true
+				lastSleepStart = event.Timestamp
+			}
+			
+		case "wake":
+			handleSleepInterruption(event.Timestamp)
+			
+		case "leftBoob":
+			if !isEatingLeft {
+				stats.LeftBoobCount++
+				leftBoobStart = event.Timestamp
+				isEatingLeft = true
+			}
+			// If was sleeping, add sleep time and stop sleeping
+			handleSleepInterruption(event.Timestamp)
+			
+		case "leftBoobStop":
+			if isEatingLeft {
+				stats.LeftBoobDuration += event.Timestamp - leftBoobStart
+				isEatingLeft = false
+			}
+			
+		case "rightBoob":
+			if !isEatingRight {
+				stats.RightBoobCount++
+				rightBoobStart = event.Timestamp
+				isEatingRight = true
+			}
+			// If was sleeping, add sleep time and stop sleeping
+			handleSleepInterruption(event.Timestamp)
+			
+		case "rightBoobStop":
+			if isEatingRight {
+				stats.RightBoobDuration += event.Timestamp - rightBoobStart
+				isEatingRight = false
+			}
+			
+		case "pee":
+			stats.PeeCount++
+			// If was sleeping, add sleep time and stop sleeping
+			handleSleepInterruption(event.Timestamp)
+			
+		case "poop":
+			stats.PoopCount++
+			// If was sleeping, add sleep time and stop sleeping
+			handleSleepInterruption(event.Timestamp)
+		}
+	}
+	
+	// Handle ongoing states at the end of the period
+	currentTime := end
+	if isSleeping {
+		ongoingSleepTime := currentTime - lastSleepStart
+		
+		// If sleep started before period, only count time within the period
+		if lastSleepStart < start {
+			ongoingSleepTime = currentTime - start
+		}
+		
+		stats.SleepTime += ongoingSleepTime
+		// Don't count ongoing sleep as a completed session for average calculation
+	}
+	if isEatingLeft {
+		stats.LeftBoobDuration += currentTime - leftBoobStart
+	}
+	if isEatingRight {
+		stats.RightBoobDuration += currentTime - rightBoobStart
+	}
+	
+	// Calculate average sleep time from completed sessions only
+	if stats.SleepCount > 0 {
+		totalCompletedSleepTime := int64(0)
+		for _, duration := range sleepSessions {
+			totalCompletedSleepTime += duration
+		}
+		stats.AverageSleepTime = totalCompletedSleepTime / int64(stats.SleepCount)
+	}
+	
+	return stats
 }
