@@ -1,6 +1,6 @@
 module github.com/heroku/babycheck
 
-// +heroku goVersion go1.20
+// +heroku goVersion go1.23
 go 1.24.0
 
 require (
