@@ -11,10 +11,12 @@ import {
   faChevronLeft,
   faChevronRight,
   faChartBar,
-  faTimes
+  faTimes,
+  faEnvelope
 } from "@fortawesome/free-solid-svg-icons";
 import Api from "./api/Api";
 import "./App.css";
+import html2canvas from "html2canvas";
 
 // Event icon mapping
 const eventIcons = {
@@ -40,7 +42,7 @@ const eventColors = {
   rightBoob: '#8b5a8c',
 };
 
-function CalendarView() {
+function CalendarView({ user, onLogout }) {
   const [events, setEvents] = useState({});
   const [currentDay, setCurrentDay] = useState(() => {
     const today = new Date();
@@ -61,6 +63,14 @@ function CalendarView() {
   const [selectedAction, setSelectedAction] = useState(null);
   const longPressTimeoutRef = useRef(null);
   const timelineRef = useRef(null);
+  const calendarRef = useRef(null);
+  
+  // Double tap detection
+  const [lastTap, setLastTap] = useState(null);
+  const doubleTapTimeoutRef = useRef(null);
+  
+  // Email report state
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   // Generate hour markers (00h to 23h)
   const hourMarkers = Array.from({ length: 24 }, (_, i) => {
@@ -185,6 +195,39 @@ function CalendarView() {
     setTimeout(() => setIsTransitioning(false), 200);
   };
 
+  // Handle email report
+  const handleEmailReport = async () => {
+    if (sendingEmail) return;
+    
+    setSendingEmail(true);
+    try {
+      // Capture calendar screenshot
+      let calendarImage = null;
+      if (calendarRef.current) {
+        try {
+          const canvas = await html2canvas(calendarRef.current, {
+            backgroundColor: '#1a1a1a',
+            scale: 1,
+            useCORS: true,
+            allowTaint: true,
+            height: calendarRef.current.scrollHeight,
+            scrollX: 0,
+            scrollY: 0
+          });
+          calendarImage = canvas.toDataURL('image/png');
+        } catch (screenshotError) {
+          console.warn('Failed to capture calendar screenshot:', screenshotError);
+        }
+      }
+
+      const response = await Api.sendCalendarReport(currentDay, calendarImage);
+      alert(`Rapport envoyé à votre email avec ${response.events} événements !`);
+    } catch (error) {
+      alert(`Erreur: ${error.message}`);
+    }
+    setSendingEmail(false);
+  };
+
   // Calculate time from Y position in timeline
   const calculateTimeFromPosition = (clientY, timelineRect) => {
     const relativeY = clientY - timelineRect.top;
@@ -213,6 +256,30 @@ function CalendarView() {
     return currentDay === todayStr;
   };
 
+  // Show wheel at position
+  const showWheelAtPosition = (clientX, clientY) => {
+    if (timelineRef.current) {
+      const rect = timelineRef.current.getBoundingClientRect();
+      const time = calculateTimeFromPosition(clientY, rect);
+      
+      const clampedPosition = clampWheelPosition(clientX, clientY);
+      setWheelPosition(clampedPosition);
+      setWheelTime(time);
+      setShowIconWheel(true);
+    }
+  };
+
+  // Double click detection for mouse (use onDoubleClick event instead)
+  const handleMouseDoubleClick = (e) => {
+    // Only show wheel on today
+    if (!isToday()) return;
+    
+    const clientX = e.clientX;
+    const clientY = e.clientY;
+    
+    showWheelAtPosition(clientX, clientY);
+  };
+
   // Mouse event handlers for long press (desktop)
   const handleMouseDown = (e) => {
     // Only show wheel on today
@@ -224,15 +291,7 @@ function CalendarView() {
     
     // Start long press timer for mouse
     longPressTimeoutRef.current = setTimeout(() => {
-      if (timelineRef.current) {
-        const rect = timelineRef.current.getBoundingClientRect();
-        const time = calculateTimeFromPosition(clientY, rect);
-        
-        const clampedPosition = clampWheelPosition(clientX, clientY);
-        setWheelPosition(clampedPosition);
-        setWheelTime(time);
-        setShowIconWheel(true);
-      }
+      showWheelAtPosition(clientX, clientY);
     }, 600); // 600ms long press threshold
   };
 
@@ -294,14 +353,39 @@ function CalendarView() {
     }
   };
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (e) => {
     // Clear long press timer
     if (longPressTimeoutRef.current) {
       clearTimeout(longPressTimeoutRef.current);
       longPressTimeoutRef.current = null;
     }
     
-    // Only process swipe if wheel is not showing
+    // Double tap detection for touch
+    if (isToday() && e.changedTouches && e.changedTouches[0]) {
+      const now = Date.now();
+      const touch = e.changedTouches[0];
+      const clientX = touch.clientX;
+      const clientY = touch.clientY;
+      
+      // Check if this is a tap (not a swipe)
+      const isSimpleTap = !touchEnd || Math.abs(touchStart - touch.clientX) < 10;
+      
+      if (isSimpleTap && lastTap && now - lastTap.time < 300) {
+        // Double tap detected
+        clearTimeout(doubleTapTimeoutRef.current);
+        showWheelAtPosition(clientX, clientY);
+        setLastTap(null);
+        return; // Don't process swipe
+      } else if (isSimpleTap) {
+        // First tap
+        setLastTap({ time: now, x: clientX, y: clientY });
+        doubleTapTimeoutRef.current = setTimeout(() => {
+          setLastTap(null);
+        }, 300);
+      }
+    }
+    
+    // Only process swipe if wheel is not showing and it's actually a swipe
     if (!showIconWheel && touchStart && touchEnd) {
       const distance = touchStart - touchEnd;
       const isLeftSwipe = distance > 50;
@@ -490,8 +574,51 @@ function CalendarView() {
         });
         delete sleepSessions.current;
       }
-      // Handle feeding
+      // Handle feeding with automatic session termination
       else if (name === 'leftBoob' || name === 'rightBoob') {
+        // If starting feeding on one side, automatically end any ongoing session on the other side
+        if (name === 'leftBoob' && feedingSessions.rightBoob) {
+          // End right breast session
+          const session = feedingSessions.rightBoob;
+          const duration = calculateDuration(session.start, timestamp);
+          const columnPos = getColumnPosition('rightBoob');
+          processed.push({
+            type: 'duration',
+            name: 'rightBoob',
+            startTimestamp: session.start,
+            endTimestamp: timestamp,
+            position: timestampToPosition(session.start),
+            duration: duration,
+            height: (duration / 1440) * 100,
+            icon: eventIcons.rightBoob,
+            color: eventColors.rightBoob,
+            columnLeft: columnPos.left,
+            columnWidth: columnPos.width
+          });
+          delete feedingSessions.rightBoob;
+        }
+        else if (name === 'rightBoob' && feedingSessions.leftBoob) {
+          // End left breast session
+          const session = feedingSessions.leftBoob;
+          const duration = calculateDuration(session.start, timestamp);
+          const columnPos = getColumnPosition('leftBoob');
+          processed.push({
+            type: 'duration',
+            name: 'leftBoob',
+            startTimestamp: session.start,
+            endTimestamp: timestamp,
+            position: timestampToPosition(session.start),
+            duration: duration,
+            height: (duration / 1440) * 100,
+            icon: eventIcons.leftBoob,
+            color: eventColors.leftBoob,
+            columnLeft: columnPos.left,
+            columnWidth: columnPos.width
+          });
+          delete feedingSessions.leftBoob;
+        }
+        
+        // Start new feeding session
         feedingSessions[name] = { start: timestamp, type: name };
       }
       else if (name === 'leftBoobStop' && feedingSessions.leftBoob) {
@@ -597,7 +724,7 @@ function CalendarView() {
   const currentTimePos = getCurrentTimePosition();
 
   return (
-    <div className="App">
+    <div className="App" ref={calendarRef}>
       <header className="App-header">
         {/* Header with back button and title */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: '400px', marginBottom: '20px' }}>
@@ -620,20 +747,39 @@ function CalendarView() {
             Retour
           </Link>
           <h2 style={{ margin: 0, fontSize: '24px' }}>Calendrier</h2>
-          <Link 
-            to="/stats"
-            style={{ 
-              padding: '4px 8px',
-              backgroundColor: '#4a90e2',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '12px',
-              textDecoration: 'none'
-            }}
-          >
-            <FontAwesomeIcon icon={faChartBar} />
-          </Link>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={handleEmailReport}
+              disabled={sendingEmail}
+              style={{ 
+                padding: '4px 8px',
+                backgroundColor: sendingEmail ? '#666666' : '#28a745',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '12px',
+                cursor: sendingEmail ? 'not-allowed' : 'pointer',
+                opacity: sendingEmail ? 0.5 : 1
+              }}
+              title="Envoyer le rapport par email"
+            >
+              <FontAwesomeIcon icon={faEnvelope} />
+            </button>
+            <Link 
+              to="/stats"
+              style={{ 
+                padding: '4px 8px',
+                backgroundColor: '#4a90e2',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '12px',
+                textDecoration: 'none'
+              }}
+            >
+              <FontAwesomeIcon icon={faChartBar} />
+            </Link>
+          </div>
         </div>
 
         {/* Date navigation */}
@@ -794,6 +940,7 @@ function CalendarView() {
           onMouseDown={handleMouseDown}
           onMouseUp={handleMouseUp}
           onMouseMove={handleMouseMove}
+          onDoubleClick={handleMouseDoubleClick}
           onContextMenu={(e) => e.preventDefault()} // Prevent browser context menu
         >
           {/* Hour markers */}
@@ -901,6 +1048,41 @@ function CalendarView() {
                 setSelectedAction(null);
               }}
             />
+
+            {/* Status title above wheel */}
+            <div style={{
+              position: 'fixed',
+              left: wheelPosition.x - 100,
+              top: wheelPosition.y - 130,
+              width: '200px',
+              backgroundColor: '#1a1a1a',
+              border: '1px solid #4a5568',
+              borderRadius: '6px',
+              padding: '8px',
+              textAlign: 'center',
+              zIndex: 1001
+            }}>
+              <span style={{
+                fontSize: '12px',
+                color: '#e0e0e0',
+                fontWeight: 'bold'
+              }}>
+                {(() => {
+                  const currentState = getCurrentBabyState();
+                  const babyName = user?.username || 'Bébé';
+                  
+                  if (currentState.feeding === 'leftBoob') {
+                    return `${babyName} tète (G)`;
+                  } else if (currentState.feeding === 'rightBoob') {
+                    return `${babyName} tète (D)`;
+                  } else if (currentState.sleep === 'sleeping') {
+                    return `${babyName} dort`;
+                  } else {
+                    return `${babyName} est éveillé`;
+                  }
+                })()}
+              </span>
+            </div>
             
             {/* Icon Wheel */}
             <div style={{

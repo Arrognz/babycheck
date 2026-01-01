@@ -398,6 +398,34 @@ class Api {
             throw e;
         }
     }
+
+    async sendCalendarReport(date, calendarImage = null) {
+        try {
+            const body = { date };
+            if (calendarImage) {
+                body.calendar_image = calendarImage;
+            }
+
+            const response = await fetch(`${this.baseUrl}/send-calendar-report`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...this.getAuthHeaders()
+                },
+                body: JSON.stringify(body)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Calendar report send failed');
+            }
+
+            return await response.json();
+        } catch (e) {
+            console.error('Calendar report error:', e);
+            throw e;
+        }
+    }
 }
 
 const api = new Api();

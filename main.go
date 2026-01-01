@@ -780,6 +780,183 @@ func requestPasswordReset(c *gin.Context) {
 	})
 }
 
+func sendCalendarReport(c *gin.Context) {
+	var requestBody struct {
+		Date          string `json:"date"`           // YYYY-MM-DD format
+		CalendarImage string `json:"calendar_image"` // Base64 encoded image
+	}
+	err := c.BindJSON(&requestBody)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Date required in YYYY-MM-DD format",
+		})
+		return
+	}
+
+	_, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "User authentication required",
+		})
+		return
+	}
+
+	username, exists := c.Get("username")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "Username not found in token",
+		})
+		return
+	}
+
+	// Get user to get email
+	userStorage := storage.NewUserStorage()
+	if userStorage == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Database connection error",
+		})
+		return
+	}
+
+	user, err := userStorage.GetUser(username.(string))
+	if err != nil || user.Email == "" || !user.EmailVerified {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Email address not verified. Please verify your email first.",
+		})
+		return
+	}
+
+	// Get events for the specified day
+	tmp, _ := c.Get("storage")
+	store := tmp.(*storage.Storage)
+	
+	dayStart, _ := time.Parse("2006-01-02", requestBody.Date)
+	dayStartMs := dayStart.UnixMilli()
+	dayEndMs := dayStart.Add(24*time.Hour - time.Millisecond).UnixMilli()
+	
+	events := store.Search(dayStartMs, dayEndMs)
+
+	// Generate email content
+	emailService := storage.NewEmailService()
+	if emailService == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Email service not configured",
+		})
+		return
+	}
+
+	subject := fmt.Sprintf("Rapport journalier de %s - %s", user.Username, dayStart.Format("02/01/2006"))
+	emailBody := generateCalendarEmailReport(user.Username, requestBody.Date, events)
+
+	// Send email with image attachment if provided
+	if requestBody.CalendarImage != "" {
+		err = emailService.SendEmailWithImage(user.Email, subject, emailBody, requestBody.CalendarImage)
+	} else {
+		err = emailService.SendEmail(user.Email, subject, emailBody)
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": fmt.Sprintf("Failed to send email: %v", err),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": fmt.Sprintf("Calendar report sent to %s", user.Email),
+		"date":    requestBody.Date,
+		"events":  len(events),
+	})
+}
+
+func generateCalendarEmailReport(babyName, date string, events []storage.DBBabyEvent) string {
+	// Parse date for formatting
+	dayDate, _ := time.Parse("2006-01-02", date)
+	formattedDate := dayDate.Format("lundi 02 janvier 2006")
+	
+	// Start HTML
+	html := fmt.Sprintf(`
+		<h1>📅 Rapport journalier de %s</h1>
+		<h2>%s</h2>
+		<hr>
+		<h3>📊 Vue du calendrier</h3>
+		<img src="cid:calendar-screenshot" style="max-width: 100%%; height: auto; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 20px;" alt="Calendrier du jour" />
+		<hr>
+	`, babyName, formattedDate)
+
+	// Group events by type
+	sleepEvents := []storage.DBBabyEvent{}
+	feedingEvents := []storage.DBBabyEvent{}
+	changeEvents := []storage.DBBabyEvent{}
+	
+	for _, event := range events {
+		switch event.Name {
+		case "sleep", "wake":
+			sleepEvents = append(sleepEvents, event)
+		case "leftBoob", "rightBoob", "leftBoobStop", "rightBoobStop":
+			feedingEvents = append(feedingEvents, event)
+		case "pee", "poop":
+			changeEvents = append(changeEvents, event)
+		}
+	}
+
+	// Summary
+	html += "<h3>🔍 Résumé de la journée</h3><ul>"
+	html += fmt.Sprintf("<li>💤 Événements de sommeil : %d</li>", len(sleepEvents))
+	html += fmt.Sprintf("<li>🍼 Événements d'allaitement : %d</li>", len(feedingEvents))
+	html += fmt.Sprintf("<li>🚽 Changes : %d</li>", len(changeEvents))
+	html += "</ul><hr>"
+
+	// Events table
+	html += "<h3>📋 Tableau des événements</h3>"
+	html += `<table style="border-collapse: collapse; width: 100%; border: 1px solid #ddd;">
+		<tr style="background-color: #f2f2f2;">
+			<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Heure</th>
+			<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Événement</th>
+		</tr>`
+
+	for _, event := range events {
+		eventTime := time.UnixMilli(event.Timestamp).Format("15:04")
+		eventName := getEventDisplayName(event.Name)
+		html += fmt.Sprintf(`
+			<tr>
+				<td style="border: 1px solid #ddd; padding: 8px;">%s</td>
+				<td style="border: 1px solid #ddd; padding: 8px;">%s</td>
+			</tr>`, eventTime, eventName)
+	}
+
+	html += "</table><br>"
+
+	// Footer
+	html += `<hr>
+		<p><small>📧 Rapport généré automatiquement par BabyCheck</small></p>
+		<p><small>🕐 Envoyé le ` + time.Now().Format("02/01/2006 à 15:04") + `</small></p>`
+
+	return html
+}
+
+func getEventDisplayName(eventName string) string {
+	switch eventName {
+	case "sleep":
+		return "💤 Début du sommeil"
+	case "wake":
+		return "☀️ Réveil"
+	case "leftBoob":
+		return "🍼 Début allaitement (sein gauche)"
+	case "leftBoobStop":
+		return "🍼 Fin allaitement (sein gauche)"
+	case "rightBoob":
+		return "🍼 Début allaitement (sein droit)"
+	case "rightBoobStop":
+		return "🍼 Fin allaitement (sein droit)"
+	case "pee":
+		return "💧 Pipi"
+	case "poop":
+		return "💩 Caca"
+	default:
+		return eventName
+	}
+}
+
 func resetPassword(c *gin.Context) {
 	var body struct {
 		Token    string `json:"token"`
@@ -919,6 +1096,9 @@ func main() {
 		
 		// Account management
 		api.DELETE("/delete-account", deleteAccount)
+		
+		// Calendar report
+		api.POST("/send-calendar-report", sendCalendarReport)
 	}
 	
 	// Admin endpoints (require admin role)

@@ -1,10 +1,14 @@
 package storage
 
 import (
+	"bytes"
 	"crypto/tls"
 	"fmt"
+	"mime/multipart"
 	"net/smtp"
+	"net/textproto"
 	"os"
+	"strings"
 )
 
 type EmailService struct {
@@ -156,4 +160,109 @@ func (e *EmailService) SendPasswordResetLink(to, token string) error {
 	`, resetLink, resetLink)
 
 	return e.SendEmail(to, subject, body)
+}
+
+func (e *EmailService) SendEmailWithImage(to, subject, body, base64Image string) error {
+	// Configuration TLS
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: false,
+		ServerName:         e.host,
+	}
+
+	// Connexion au serveur SMTP
+	conn, err := tls.Dial("tcp", e.host+":"+e.port, tlsConfig)
+	if err != nil {
+		return fmt.Errorf("TLS connection error: %v", err)
+	}
+	defer conn.Close()
+
+	// Create SMTP client
+	client, err := smtp.NewClient(conn, e.host)
+	if err != nil {
+		return fmt.Errorf("SMTP client creation error: %v", err)
+	}
+	defer client.Quit()
+
+	// Authentication
+	auth := smtp.PlainAuth("", e.username, e.password, e.host)
+	if err = client.Auth(auth); err != nil {
+		return fmt.Errorf("SMTP authentication error: %v", err)
+	}
+
+	// Configure sender/recipient
+	if err = client.Mail(e.from); err != nil {
+		return fmt.Errorf("sender configuration error: %v", err)
+	}
+	if err = client.Rcpt(to); err != nil {
+		return fmt.Errorf("recipient configuration error: %v", err)
+	}
+
+	// Write message
+	writer, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("data writer error: %v", err)
+	}
+	defer writer.Close()
+
+	// Create multipart message with image attachment
+	var buffer bytes.Buffer
+	multipartWriter := multipart.NewWriter(&buffer)
+
+	// Message headers
+	headers := make(textproto.MIMEHeader)
+	headers.Set("To", to)
+	headers.Set("From", e.from)
+	headers.Set("Subject", subject)
+	headers.Set("MIME-Version", "1.0")
+	headers.Set("Content-Type", fmt.Sprintf("multipart/related; boundary=%s", multipartWriter.Boundary()))
+
+	// Write headers
+	for key, values := range headers {
+		for _, value := range values {
+			fmt.Fprintf(&buffer, "%s: %s\r\n", key, value)
+		}
+	}
+	fmt.Fprintf(&buffer, "\r\n")
+
+	// HTML part
+	htmlPartHeader := make(textproto.MIMEHeader)
+	htmlPartHeader.Set("Content-Type", "text/html; charset=UTF-8")
+	htmlPartHeader.Set("Content-Transfer-Encoding", "quoted-printable")
+	
+	htmlWriter, err := multipartWriter.CreatePart(htmlPartHeader)
+	if err != nil {
+		return fmt.Errorf("failed to create HTML part: %v", err)
+	}
+	htmlWriter.Write([]byte(body))
+
+	// Image attachment part
+	if base64Image != "" {
+		// Remove data:image/png;base64, prefix if present
+		if strings.Contains(base64Image, ",") {
+			base64Image = strings.Split(base64Image, ",")[1]
+		}
+		
+		imagePartHeader := make(textproto.MIMEHeader)
+		imagePartHeader.Set("Content-Type", "image/png")
+		imagePartHeader.Set("Content-Transfer-Encoding", "base64")
+		imagePartHeader.Set("Content-ID", "<calendar-screenshot>")
+		imagePartHeader.Set("Content-Disposition", "inline; filename=\"calendar.png\"")
+		
+		imageWriter, err := multipartWriter.CreatePart(imagePartHeader)
+		if err != nil {
+			return fmt.Errorf("failed to create image part: %v", err)
+		}
+		imageWriter.Write([]byte(base64Image))
+	}
+
+	multipartWriter.Close()
+
+	// Send the complete message
+	_, err = writer.Write(buffer.Bytes())
+	if err != nil {
+		return fmt.Errorf("message write error: %v", err)
+	}
+
+	fmt.Printf("Email with image sent successfully to %s (Subject: %s)\n", to, subject)
+	return nil
 }
